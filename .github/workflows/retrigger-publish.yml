@@ -1,0 +1,21 @@
+name: Retrigger recovered project publication
+
+on:
+  push:
+    branches:
+      - recovery/ultradeck-v8.1-pinterest-1.9
+    paths:
+      - .github/workflows/retrigger-publish.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  retrigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch publication workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish-recovered-projects.yml --repo Herbertofury/UltraDeck --ref recovery/ultradeck-v8.1-pinterest-1.9
