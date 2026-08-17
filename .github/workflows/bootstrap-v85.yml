@@ -1,0 +1,98 @@
+name: Publish UltraDeck v8.5.0
+
+on:
+  push:
+    paths:
+      - 'bootstrap-v85/ready'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified v8.5 source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap-v85/patch.b64.* | base64 -d > /tmp/ud85.patch.gz
+          echo '729bc85f831c326bc73c483d3915c1d4303c51dda87d547d0eb3ee341c4a27bd  /tmp/ud85.patch.gz' | sha256sum -c -
+          gzip -dc /tmp/ud85.patch.gz > /tmp/ud85.patch
+          git apply --check /tmp/ud85.patch
+          git apply /tmp/ud85.patch
+          test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = '8.5.0'
+          test "$(sha256sum shared-runtime-source/ultradeck-runtime-body.js | cut -d' ' -f1)" = '89178d94b4ebb7c0091db322c2db0ba249f3bbe36a9dd354d50449c4d7c38bd3'
+          test "$(sha256sum shared-runtime-source/adapters/tiktok.js | cut -d' ' -f1)" = '460141cffeae2d6c4abb2f7b580f324c33bde820ebbdf3d51a8b14c92cbebdd7'
+
+      - name: Build and statically verify v8.5.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 shared-runtime-source/build_runtime.py
+          python3 scripts/build_portable.py
+          python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py
+          node --check shared-runtime-source/ultradeck-runtime-body.js
+          node --check shared-runtime-source/adapters/tiktok.js
+          node --check dist-manual/chromium-mv3/runtime-main.js
+          node --check dist-manual/chromium-mv3/site-tiktok.js
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          required={'https://www.tumblr.com/*','https://www.patreon.com/*','https://x.com/*','https://twitter.com/*','https://www.tiktok.com/*'}
+          for browser in ('chromium-mv3','firefox-mv3'):
+              root=Path('dist-manual')/browser
+              manifest=json.loads((root/'manifest.json').read_text())
+              assert manifest['version']=='8.5.0'
+              assert required.issubset(set(manifest['host_permissions']))
+              assert manifest['options_ui']['page']=='options.html'
+              assert (root/'site-tiktok.js').is_file()
+          PY
+
+      - name: Package exact v8.5.0 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/workflows/bootstrap-v85.yml /tmp/bootstrap-v85.yml
+          rm .github/workflows/bootstrap-v85.yml
+          python3 scripts/package_release.py
+          cp /tmp/bootstrap-v85.yml .github/workflows/bootstrap-v85.yml
+          cat > /tmp/expected-v85.sha256 <<'EOF'
+          0adfd747b9fab15b5495ba7c32e68c97d60c4473d4a5200f9985a1806eb245b6  Patreon-UltraWide-Deck-v8.5.0.user.js
+          6c662c706ed83660e3e54e1b17fe304ef185c54a22d0d8e70a93397f200dcea8  TikTok-UltraWide-Deck-v8.5.0.user.js
+          7621e887f09113e69b4ef0fd1498149c8c946c7c6ad6910e486d99a0af03a5c0  Tumblr-UltraWide-Deck-v8.5.0.user.js
+          73c41f74a6dcb0c7f52a49206448e3d407f97918ae622ad8e3eb2fc913413730  X-UltraWide-Deck-v8.5.0.user.js
+          5042fdbd09810ac24eaef43f0363afb12aa7386dfc80bb9487f955da90534afb  UltraDeck-Extension-v8.5.0-chromium-mv3.zip
+          abaa9d2df610dfc6ff307805b4f06afdf3fa0b3edf0b16677f43b65142c704a5  UltraDeck-Extension-v8.5.0-firefox-mv3.zip
+          715096712096c6f799ac2216e182ee59dedf3bed25d9fe5b781b804c860606bd  UltraDeck-Extension-v8.5.0-source.zip
+          570cfb17f3dc86cd2b4cf215c58053f3f0424c5fae8f5ce4a43f36488bfc32a2  VERIFICATION.md
+          75c69bbd144fe05a46a4fa8f22c259aaf0e8530ce2aba301448706f1f6b33bb5  VERIFICATION.json
+          EOF
+          sed -i 's/^          //' /tmp/expected-v85.sha256
+          diff -u /tmp/expected-v85.sha256 releases/v8.5.0/SHA256SUMS.txt
+          echo 'e3ebc3213eeca8a8cb366e6f2109c8d82e53a5ce10b317b4f875ff064ac5e5e3  releases/v8.5.0/UltraDeck-v8.5.0-release-bundle.zip' | sha256sum -c -
+
+      - name: Publish clean source and GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf bootstrap-v85
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release UltraDeck v8.5.0'
+          git push origin HEAD:main
+          if gh release view v8.5.0 >/dev/null 2>&1; then
+            gh release upload v8.5.0 releases/v8.5.0/* --clobber
+          else
+            gh release create v8.5.0 releases/v8.5.0/* \
+              --title 'UltraDeck v8.5.0' \
+              --notes-file docs/VERIFICATION-v8.5.0.md \
+              --target main
+          fi
