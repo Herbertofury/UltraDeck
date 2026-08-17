@@ -12,20 +12,30 @@ jobs:
           python-version: '3.12'
       - run: python3 shared-runtime-source/build_runtime.py
       - run: python3 scripts/build_portable.py
-      - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py
+      - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py
       - run: |
           python3 - <<'PY'
           import json, pathlib
           root=pathlib.Path('.')
+          required_hosts={'https://www.tumblr.com/*','https://www.patreon.com/*','https://x.com/*','https://twitter.com/*','https://www.tiktok.com/*'}
           for browser in ('chromium-mv3','firefox-mv3'):
-              m=json.loads((root/'dist-manual'/browser/'manifest.json').read_text())
-              assert m['version']=='8.4.0'
+              out=root/'dist-manual'/browser
+              m=json.loads((out/'manifest.json').read_text())
+              assert m['version']=='8.5.0'
+              assert required_hosts.issubset(set(m['host_permissions']))
+              assert m['options_ui']['page']=='options.html'
+              assert (out/'site-tiktok.js').is_file()
+              assert (out/'options.html').is_file() and (out/'options.js').is_file()
           body=(root/'shared-runtime-source/ultradeck-runtime-body.js').read_text()
+          tiktok=(root/'shared-runtime-source/adapters/tiktok.js').read_text()
+          options=(root/'public/options.html').read_text()
+          bridge=(root/'entrypoints/bridge.content.ts').read_text()
           assert 'content-visibility' not in body.lower()
           assert 'identityMutationSkips' in body
           assert 'interactionAutoRetries' in body
-          assert 'annotateInteractionMirror' in body
           assert 'INTERACTION_CONTEXT_STORAGE_KEY' in body
-          assert 'missingStickyInteractionContext' in body
-          assert 'interactionDraftSyncRetries' in body
+          assert 'retainedVideoPlayback' in tiktok and 'tiktokPlaybackRecoveryInstalled' in tiktok
+          assert 'primeRetainedVideo' in body and 'ultradeck:site-gate' in body
+          assert 'ultradeckSites' in bridge
+          for site in ('tumblr','patreon','x','tiktok'): assert f'site-{site}' in options
           PY
