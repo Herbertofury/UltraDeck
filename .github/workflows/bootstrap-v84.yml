@@ -1,0 +1,154 @@
+name: Publish UltraDeck v8.4.0
+
+on:
+  push:
+    paths:
+      - 'bootstrap-v84/ready'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified v8.4 delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap-v84/patch.b64.* | base64 -d > /tmp/ud84.patch.gz
+          echo 'f4d9b887c79606747aad94977f286672794521ef36ca94f4156771bde66afa0f  /tmp/ud84.patch.gz' | sha256sum -c -
+          gzip -dc /tmp/ud84.patch.gz > /tmp/ud84.patch
+          git apply --check /tmp/ud84.patch
+          git apply /tmp/ud84.patch
+          test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = '8.4.0'
+          test "$(sha256sum shared-runtime-source/ultradeck-runtime-body.js | cut -d' ' -f1)" = '9f62d87d00bd40c8b3c64473e0037df831b5dcf860a24ee0ceaf845e8757c806'
+
+      - name: Build v8.4.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 shared-runtime-source/build_runtime.py
+          python3 scripts/build_portable.py
+          python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py tests/policy_isolated_browser.py tests/test_popup_ui.py tests/test_v74_no_cap_scale.py tests/test_v82_jank_sites.py tests/test_v83_interaction_capsules.py tests/test_v84_context_state.py tests/test_v8_multisite_extension.py
+          node --check shared-runtime-source/ultradeck-runtime-body.js
+          node --check dist-manual/chromium-mv3/runtime-main.js
+          node --check dist-manual/firefox-mv3/runtime-main.js
+          test "$(python3 -c 'import json; print(json.load(open("dist-manual/chromium-mv3/manifest.json"))["version"])')" = '8.4.0'
+          test "$(python3 -c 'import json; print(json.load(open("dist-manual/firefox-mv3/manifest.json"))["version"])')" = '8.4.0'
+
+      - name: Package exact v8.4.0 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf releases/v8.4.0
+          mkdir -p releases/v8.4.0
+          cp dist/Patreon-UltraWide-Deck-v8.4.0.user.js releases/v8.4.0/
+          cp dist/Tumblr-UltraWide-Deck-v8.4.0.user.js releases/v8.4.0/
+          cp dist/X-UltraWide-Deck-v8.4.0.user.js releases/v8.4.0/
+          cp docs/VERIFICATION-v8.4.0.md releases/v8.4.0/VERIFICATION.md
+          cp docs/VERIFICATION-v8.4.0.json releases/v8.4.0/VERIFICATION.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          root = Path('.')
+          out = Path('releases/v8.4.0')
+          fixed = (2026, 8, 17, 0, 0, 0)
+
+          def add(z, path, arcname):
+              info = zipfile.ZipInfo(str(arcname).replace('\\\\', '/'), date_time=fixed)
+              info.compress_type = zipfile.ZIP_DEFLATED
+              info.external_attr = (path.stat().st_mode & 0xffff) << 16
+              z.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+
+          def zip_tree(src, output):
+              src = Path(src)
+              with zipfile.ZipFile(output, 'w') as z:
+                  for path in sorted(src.rglob('*')):
+                      if path.is_file():
+                          add(z, path, path.relative_to(src))
+
+          zip_tree(root / 'dist-manual/chromium-mv3', out / 'UltraDeck-Extension-v8.4.0-chromium-mv3.zip')
+          zip_tree(root / 'dist-manual/firefox-mv3', out / 'UltraDeck-Extension-v8.4.0-firefox-mv3.zip')
+
+          excluded = {'.git', 'bootstrap-v83', 'bootstrap-v84', 'releases', 'dist', 'dist-manual', 'src', 'node_modules', '.wxt', '__pycache__', '.pytest_cache'}
+          with zipfile.ZipFile(out / 'UltraDeck-Extension-v8.4.0-source.zip', 'w') as z:
+              for path in sorted(root.rglob('*')):
+                  if not path.is_file():
+                      continue
+                  rel = path.relative_to(root)
+                  if any(part in excluded for part in rel.parts):
+                      continue
+                  if rel.as_posix() == '.github/workflows/bootstrap-v84.yml':
+                      continue
+                  add(z, path, Path('UltraDeck-Extension-v8.4.0') / rel)
+          PY
+          (cd releases/v8.4.0 && sha256sum \
+            Patreon-UltraWide-Deck-v8.4.0.user.js \
+            Tumblr-UltraWide-Deck-v8.4.0.user.js \
+            X-UltraWide-Deck-v8.4.0.user.js \
+            UltraDeck-Extension-v8.4.0-chromium-mv3.zip \
+            UltraDeck-Extension-v8.4.0-firefox-mv3.zip \
+            UltraDeck-Extension-v8.4.0-source.zip \
+            VERIFICATION.md VERIFICATION.json > SHA256SUMS.txt)
+          cat > /tmp/expected-v84.sha256 <<'EOF'
+          594b898130be3212c068139936386697d63d1edd35ba4865182cab644970474e  Patreon-UltraWide-Deck-v8.4.0.user.js
+          fd8cc783b52e6abec64808c907043a6f9556f637ef72a13e209bb7d3ea42cf5a  Tumblr-UltraWide-Deck-v8.4.0.user.js
+          e723fc43218400277927501a3f40d7657dbc580c55d9dcdddbb9693d00b3d28f  X-UltraWide-Deck-v8.4.0.user.js
+          bf1454d575c9e86a55bfbba6c1346f0adba0b726ccc176013120299d641cc2f8  UltraDeck-Extension-v8.4.0-chromium-mv3.zip
+          7987b61305c08a96430f2233881773a3d02ab7df94c3260e015607aa53f39b57  UltraDeck-Extension-v8.4.0-firefox-mv3.zip
+          c8e16294f1d06d27ac5f6ee5a3b2f6192229a083a751ec9da5e6c5fc1afa9352  UltraDeck-Extension-v8.4.0-source.zip
+          889378987178dae657be9c4af1e984502d7828c1811d069bf1451df954e61c25  VERIFICATION.md
+          558b29ad388bdfcdd64be383b22cadb9cd6d17eacc12c29adf97799b1223ff81  VERIFICATION.json
+          EOF
+          sed -i 's/^          //' /tmp/expected-v84.sha256
+          diff -u /tmp/expected-v84.sha256 releases/v8.4.0/SHA256SUMS.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('releases/v8.4.0')
+          fixed = (2026, 8, 17, 0, 0, 0)
+          names = [
+              'Patreon-UltraWide-Deck-v8.4.0.user.js', 'SHA256SUMS.txt',
+              'Tumblr-UltraWide-Deck-v8.4.0.user.js',
+              'UltraDeck-Extension-v8.4.0-chromium-mv3.zip',
+              'UltraDeck-Extension-v8.4.0-firefox-mv3.zip',
+              'UltraDeck-Extension-v8.4.0-source.zip', 'VERIFICATION.json',
+              'VERIFICATION.md', 'X-UltraWide-Deck-v8.4.0.user.js'
+          ]
+          with zipfile.ZipFile(out / 'UltraDeck-v8.4.0-release-bundle.zip', 'w') as z:
+              for name in sorted(names):
+                  path = out / name
+                  info = zipfile.ZipInfo(name, date_time=fixed)
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = (path.stat().st_mode & 0xffff) << 16
+                  z.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+          PY
+          echo '166647ad58c99aa2c507d868aa89551ae82a9816f05a8996dbaa49d9fb9a5e3e  releases/v8.4.0/UltraDeck-v8.4.0-release-bundle.zip' > releases/v8.4.0/BUNDLE-SHA256.txt
+          sha256sum -c releases/v8.4.0/BUNDLE-SHA256.txt
+
+      - name: Publish source and GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf bootstrap-v83 bootstrap-v84
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release UltraDeck v8.4.0'
+          git push origin HEAD:main
+          if gh release view v8.4.0 >/dev/null 2>&1; then
+            gh release upload v8.4.0 releases/v8.4.0/* --clobber
+          else
+            gh release create v8.4.0 releases/v8.4.0/* \
+              --title 'UltraDeck v8.4.0' \
+              --notes-file docs/VERIFICATION-v8.4.0.md \
+              --target main
+          fi
