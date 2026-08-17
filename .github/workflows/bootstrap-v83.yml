@@ -1,0 +1,105 @@
+name: Publish UltraDeck v8.3.0
+
+on:
+  push:
+    paths:
+      - 'bootstrap-v83/ready'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reassemble verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap-v83/source.b64.* | base64 -d > /tmp/ultradeck-v8.3.0-source.zip
+          echo '0b835d8743bdc00950367309f794a6a6bc0fc18b8ff7420c54d1d8d33f1a32d9  /tmp/ultradeck-v8.3.0-source.zip' | sha256sum -c -
+          rm -rf /tmp/ud83
+          mkdir -p /tmp/ud83
+          unzip -q /tmp/ultradeck-v8.3.0-source.zip -d /tmp/ud83
+          test -f /tmp/ud83/UltraDeck-Extension-v8.3.0/shared-runtime-source/ultradeck-runtime-body.js
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='bootstrap-v83/' \
+            --exclude='.github/workflows/bootstrap-v83.yml' \
+            --exclude='.github/workflows/verify.yml' \
+            /tmp/ud83/UltraDeck-Extension-v8.3.0/ ./
+
+      - name: Build v8.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 shared-runtime-source/build_runtime.py
+          python3 scripts/build_portable.py
+          python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py tests/test_v83_interaction_capsules.py tests/test_v82_jank_sites.py tests/test_v74_no_cap_scale.py tests/test_v8_multisite_extension.py
+          node --check shared-runtime-source/ultradeck-runtime-body.js
+          node --check dist-manual/chromium-mv3/runtime-main.js
+          test "$(python3 -c 'import json;print(json.load(open("dist-manual/chromium-mv3/manifest.json"))["version"])')" = '8.3.0'
+
+      - name: Package exact release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf releases/v8.3.0
+          mkdir -p releases/v8.3.0
+          cp dist/Patreon-UltraWide-Deck-v8.3.0.user.js releases/v8.3.0/
+          cp dist/Tumblr-UltraWide-Deck-v8.3.0.user.js releases/v8.3.0/
+          cp dist/X-UltraWide-Deck-v8.3.0.user.js releases/v8.3.0/
+          cp docs/VERIFICATION-v8.3.0.md releases/v8.3.0/VERIFICATION.md
+          cp docs/VERIFICATION-v8.3.0.json releases/v8.3.0/VERIFICATION.json
+          cp /tmp/ultradeck-v8.3.0-source.zip releases/v8.3.0/UltraDeck-Extension-v8.3.0-source.zip
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          FIXED=(2026,8,16,0,0,0)
+          def add(z,p,arc):
+              info=zipfile.ZipInfo(str(arc).replace('\\','/'),date_time=FIXED)
+              info.compress_type=zipfile.ZIP_DEFLATED
+              info.external_attr=(p.stat().st_mode & 0xffff)<<16
+              z.writestr(info,p.read_bytes(),compress_type=zipfile.ZIP_DEFLATED,compresslevel=9)
+          def ztree(src,out):
+              src=Path(src)
+              with zipfile.ZipFile(out,'w') as z:
+                  for p in sorted(src.rglob('*')):
+                      if p.is_file(): add(z,p,p.relative_to(src))
+          ztree('dist-manual/chromium-mv3','releases/v8.3.0/UltraDeck-Extension-v8.3.0-chromium-mv3.zip')
+          ztree('dist-manual/firefox-mv3','releases/v8.3.0/UltraDeck-Extension-v8.3.0-firefox-mv3.zip')
+          PY
+          (cd releases/v8.3.0 && sha256sum \
+            Patreon-UltraWide-Deck-v8.3.0.user.js \
+            Tumblr-UltraWide-Deck-v8.3.0.user.js \
+            X-UltraWide-Deck-v8.3.0.user.js \
+            UltraDeck-Extension-v8.3.0-chromium-mv3.zip \
+            UltraDeck-Extension-v8.3.0-firefox-mv3.zip \
+            UltraDeck-Extension-v8.3.0-source.zip \
+            VERIFICATION.md VERIFICATION.json > SHA256SUMS.txt)
+          diff -u bootstrap-v83/expected.sha256 releases/v8.3.0/SHA256SUMS.txt
+
+      - name: Publish source and release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf bootstrap-v83
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release UltraDeck v8.3.0'
+          git push origin HEAD:main
+          if gh release view v8.3.0 >/dev/null 2>&1; then
+            gh release upload v8.3.0 releases/v8.3.0/* --clobber
+          else
+            gh release create v8.3.0 releases/v8.3.0/* \
+              --title 'UltraDeck v8.3.0' \
+              --notes-file docs/VERIFICATION-v8.3.0.md \
+              --target main
+          fi
