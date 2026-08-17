@@ -106,6 +106,6 @@ jobs:
           else
             gh release create v8.2.0 releases/v8.2.0/* \
               --title 'UltraDeck v8.2.0' \
-              --notes-file docs/RELEASE-v8.2.0.md \
+              --notes-file docs/VERIFICATION-v8.2.0.md \
               --target main
           fi
