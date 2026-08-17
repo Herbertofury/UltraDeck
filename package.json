@@ -1,0 +1,21 @@
+{
+  "name": "ultradeck-extension",
+  "version": "8.2.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.9.2",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "typecheck": "tsc --noEmit -p tsconfig.standalone.json",
+    "build:portable": "python3 scripts/build_portable.py"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3",
+    "wxt": "0.21.3"
+  }
+}

@@ -1,52 +1,37 @@
-# UltraDeck + Pinterest Nocturne recovery repository
+# UltraDeck v8.2.0
 
-This repository is the durable publication point for the newest recovered **UltraDeck** and **Pinterest Nocturne** project states found during the 2026-08-15 recovery pass.
+UltraDeck turns supported single-column social feeds into a lossless ultrawide multi-column deck for **Tumblr, Patreon, X, and Twitter compatibility URLs**. It retains every captured card and native-backed interaction while removing avoidable feed jank.
 
-## UltraDeck v8.1.0
+## v8.2 performance pass
 
-UltraDeck is a lossless ultrawide multi-column feed engine for **Tumblr, Patreon, X, and the Twitter compatibility hostname**. The v8.1.0 source here was reconstructed from the exact verified v8.0.0 source plus the newest recovered **v8.1.0 WIP-009 Prepackage Source Patch**, then hardened further for current Patreon and X feed semantics.
+This release applies the same performance philosophy used by Pinterest Nocturne to the UltraDeck architecture: reject irrelevant mutation work early, coalesce scroll storms, time-slice verification work around pending input, and cache expensive site identity/source resolution.
 
-Current hardening includes:
+- Patreon supports `article`, `role="article"`, post test/tag shells, and permalink-only cards without repeatedly scanning every link.
+- X prefers the outer tweet timestamp permalink, ignores nested/quoted status links for identity, and caches exact retained source cards.
+- Unrelated `href` churn is rejected before expensive closest-post and ID processing.
+- Deck scroll metrics and buffer checks run at most once per animation frame.
+- Full geometry correctness audits yield to input and run in bounded slices rather than monopolizing a long frame.
+- Existing WIP-009 constant-time retained-order lookup and bounded virtualizer history sampling remain intact.
 
-- selected top-level feed/tab state in route identity so same-URL feed switches do not mix retained histories
-- X timestamp-permalink identity so quoted/referenced status links do not steal the outer Post ID
-- X exact-ID source restoration across every matching status link
-- Patreon semantic `role="article"` support plus permalink-derived identity fallback
-- expanded Patreon Share / Reshare / Repost and X Reply / Repost / Bookmark / Share / More native-action coverage
-- preserved off-screen native-control restoration without moving the visible UltraDeck deck
-- preserved no-culling contract: no viewport virtualization, hidden retained cards, `content-visibility`, or quantity cap
+## Non-negotiable retention contract
 
-### UltraDeck downloads
+Performance is **not** achieved with viewport virtualization, card culling, `content-visibility`, hidden retained posts, quantity caps, reduced media quality, or disabled off-screen controls. Retained cards stay mounted and actionable.
 
-- [Complete v8.1.0 source](releases/UltraDeck-v8.1.0-source.zip)
-- [Chromium MV3](releases/UltraDeck-Extension-v8.1.0-chromium-mv3.zip)
-- [Firefox MV3](releases/UltraDeck-Extension-v8.1.0-firefox-mv3.zip)
-- [Patreon userscript](releases/Patreon-UltraWide-Deck-v8.1.0.user.js)
-- [X / Twitter userscript](releases/X-UltraWide-Deck-v8.1.0.user.js)
-- [Tumblr userscript](releases/Tumblr-UltraWide-Deck-v8.1.0.user.js)
-- [Recovered WIP-009 patch](releases/UltraDeck-v8.1.0-WIP-009-Prepackage-Source-Patch.txt)
+## Build
 
-The complete source archive contains the WXT/TypeScript shell, portable builder, shared runtime, all three adapters, current research notes, regression fixtures and performance tests. Extract it before development.
+The dependency-free portable build is the canonical release path in constrained environments:
 
-## Pinterest Nocturne v1.9.0
+```text
+python3 shared-runtime-source/build_runtime.py
+python3 scripts/build_portable.py
+```
 
-The published source is the newest substantively distinct connected-Drive v1.9.0 candidate recovered on 2026-08-12. It is preserved byte-for-byte as recovered.
+The WXT project remains available for normal Node 22+ / pnpm 10+ development.
 
-### Pinterest Nocturne downloads
+## Install
 
-- [Exact recovered v1.9.0 source](releases/Pinterest-Nocturne-1.9.0-Source.zip)
-- [Chromium build](releases/pinterest-nocturne-1.9.0-chromium.zip)
-- [Firefox build](releases/pinterest-nocturne-1.9.0-firefox.zip)
+See `docs/INSTALL-OPTIONS.md`. Prebuilt Chromium/Firefox packages and standalone userscripts are under `releases/v8.2.0/`.
 
-## Verification
+## Pinterest Nocturne reference
 
-See [VERIFICATION.md](VERIFICATION.md) for the current-run evidence and its exact boundary. File sizes and SHA-256 hashes are in [RELEASE-MANIFEST.json](RELEASE-MANIFEST.json) and [SHA256SUMS.txt](releases/SHA256SUMS.txt).
-
-## Current platform references used for UltraDeck hardening
-
-- Patreon: https://support.patreon.com/hc/en-us/articles/360039998431-How-to-find-a-creator-s-posts-and-Quips
-- Patreon Quips: https://support.patreon.com/hc/en-us/articles/39299791825293-Sharing-Quips
-- Patreon creator pages: https://support.patreon.com/hc/en-us/articles/36972391815693-Your-updated-creator-page
-- X timelines: https://help.x.com/en/using-x/x-timeline
-- X developer timelines: https://docs.x.com/x-api/posts/timelines/integrate
-- Current X semantic-selector reference: https://github.com/insin/control-panel-for-twitter
+Pinterest Nocturne 1.9.0 was used as the recovered performance-design reference for this pass. UltraDeck does not vendor or copy Nocturne's site code wholesale; it applies the same class of jank-removal ideas at UltraDeck's shared runtime and adapter boundaries while preserving UltraDeck's full-retention contract.

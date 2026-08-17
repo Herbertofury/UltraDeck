@@ -1,0 +1,70 @@
+{
+  "version": "8.2.0",
+  "date": "2026-08-16",
+  "runtime": "policy-isolated Chromium 144.0.7559.96",
+  "freshPackagedChromium": true,
+  "sites": {
+    "tumblr": {
+      "cached": 12,
+      "columns": 10,
+      "identityMutationSkips": 0,
+      "geometry": 0,
+      "interactions": 0,
+      "like": true,
+      "errors": []
+    },
+    "patreon": {
+      "cached": 12,
+      "columns": 8,
+      "identityMutationSkips": 96,
+      "geometry": 0,
+      "interactions": 0,
+      "like": true,
+      "errors": []
+    },
+    "x": {
+      "cached": 12,
+      "columns": 8,
+      "identityMutationSkips": 96,
+      "geometry": 0,
+      "interactions": 0,
+      "like": true,
+      "errors": []
+    }
+  },
+  "noCapScale": {
+    "count": 2000,
+    "readyMs": 3475.4,
+    "stats": {
+      "items": 2000,
+      "hidden": 0,
+      "contentVisibility": 0,
+      "directColumns": 20
+    },
+    "diagnostics": {
+      "version": "8.2.0",
+      "cachedPosts": 2000,
+      "visibleItems": 2000,
+      "requestedColumns": 20,
+      "renderedColumns": 20,
+      "geometryViolations": 0,
+      "interactionFailures": 0,
+      "longTaskCount": 8,
+      "longTaskMs": 2953,
+      "fullScans": 1,
+      "fullScanSkips": 2
+    },
+    "errors": []
+  },
+  "constraints": {
+    "viewportVirtualization": false,
+    "contentVisibilityCulling": false,
+    "retainedCardCap": false
+  },
+  "notes": [
+    "WIP-009 O(1) retained-order lookup and bounded virtualizer sampling preserved",
+    "Scroll processing coalesced to one animation frame",
+    "Geometry correctness audits time-sliced around pending input",
+    "Patreon/X unrelated href churn rejected before post identity resolution"
+  ]
+}
