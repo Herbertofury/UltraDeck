@@ -1,6 +1,8 @@
 name: verify
 on:
   push:
+    paths-ignore:
+      - 'bootstrap-v84/**'
   pull_request:
 jobs:
   portable-build:
