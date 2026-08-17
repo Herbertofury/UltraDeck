@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -25,7 +25,12 @@ jobs:
           rm -rf /tmp/ud82
           mkdir -p /tmp/ud82
           unzip -q /tmp/ultradeck-source.zip -d /tmp/ud82
-          rsync -a --delete --exclude='.git/' --exclude='bootstrap/' --exclude='.github/workflows/bootstrap-v82.yml' /tmp/ud82/UltraDeck-Extension-v8.2.0/ ./
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='bootstrap/' \
+            --exclude='.github/workflows/bootstrap-v82.yml' \
+            --exclude='.github/workflows/verify.yml' \
+            /tmp/ud82/UltraDeck-Extension-v8.2.0/ ./
 
       - name: Build portable distributions
         shell: bash
@@ -95,7 +100,6 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf bootstrap
-          rm -f .github/workflows/bootstrap-v82.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
