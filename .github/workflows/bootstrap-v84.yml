@@ -16,19 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply verified v8.4 delta
+      - name: Apply verified sparse-to-full v8.4 delta
         shell: bash
         run: |
           set -euo pipefail
-          cat bootstrap-v84/patch.b64.* | base64 -d > /tmp/ud84.patch.gz
-          echo 'f4d9b887c79606747aad94977f286672794521ef36ca94f4156771bde66afa0f  /tmp/ud84.patch.gz' | sha256sum -c -
+          cat bootstrap-v84/patch2.b64.* | base64 -d > /tmp/ud84.patch.gz
+          echo '662c2bd74a6ed82c222b204d27f9ff68ab4d425554cd1eb05aac2b6f5dd6cae4  /tmp/ud84.patch.gz' | sha256sum -c -
           gzip -dc /tmp/ud84.patch.gz > /tmp/ud84.patch
           git apply --check /tmp/ud84.patch
           git apply /tmp/ud84.patch
           test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = '8.4.0'
           test "$(sha256sum shared-runtime-source/ultradeck-runtime-body.js | cut -d' ' -f1)" = '9f62d87d00bd40c8b3c64473e0037df831b5dcf860a24ee0ceaf845e8757c806'
 
-      - name: Build v8.4.0
+      - name: Build and statically verify v8.4.0
         shell: bash
         run: |
           set -euo pipefail
@@ -61,7 +61,7 @@ jobs:
           fixed = (2026, 8, 17, 0, 0, 0)
 
           def add(z, path, arcname):
-              info = zipfile.ZipInfo(str(arcname).replace('\\\\', '/'), date_time=fixed)
+              info = zipfile.ZipInfo(str(arcname).replace('\\', '/'), date_time=fixed)
               info.compress_type = zipfile.ZIP_DEFLATED
               info.external_attr = (path.stat().st_mode & 0xffff) << 16
               z.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
@@ -84,7 +84,7 @@ jobs:
                   rel = path.relative_to(root)
                   if any(part in excluded for part in rel.parts):
                       continue
-                  if rel.as_posix() == '.github/workflows/bootstrap-v84.yml':
+                  if rel.as_posix() in {'.github/workflows/bootstrap-v83.yml', '.github/workflows/bootstrap-v84.yml'}:
                       continue
                   add(z, path, Path('UltraDeck-Extension-v8.4.0') / rel)
           PY
@@ -132,13 +132,14 @@ jobs:
           echo '166647ad58c99aa2c507d868aa89551ae82a9816f05a8996dbaa49d9fb9a5e3e  releases/v8.4.0/UltraDeck-v8.4.0-release-bundle.zip' > releases/v8.4.0/BUNDLE-SHA256.txt
           sha256sum -c releases/v8.4.0/BUNDLE-SHA256.txt
 
-      - name: Publish source and GitHub Release
+      - name: Publish clean source and GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           rm -rf bootstrap-v83 bootstrap-v84
+          rm -f .github/workflows/bootstrap-v83.yml .github/workflows/bootstrap-v84.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
