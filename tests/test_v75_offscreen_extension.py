@@ -4,7 +4,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
 from policy_isolated_browser import ensure_isolated_browser, diagnostics as browser_diagnostics
 EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR',str(ROOT/'dist-manual/chromium-mv3'))).resolve()
-VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.4.0')
+VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.5.0')
 FIXTURE=(ROOT/'tests/fixtures/tumblr_fixture.html').read_text()
 FIXTURE=FIXTURE.replace(
     '<div class="postbody"><label>Comment <input data-testid="comment-input" value=""></label></div>',

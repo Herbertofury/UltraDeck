@@ -52,7 +52,7 @@ def main():
   for i in range(1,41): elements.append({'id':str(i),'content':[{'type':'image','media':[{'url':f'http://127.0.0.1:{port}/img/{i}/1280.png','type':'image/png','width':1280,'height':800},{'url':f'http://127.0.0.1:{port}/img/{i}/640.png','type':'image/png','width':640,'height':400},{'url':f'http://127.0.0.1:{port}/img/{i}/320.png','type':'image/png','width':320,'height':200}]}]})
   payload={'response':{'timeline':{'elements':elements}}}
   c.ev("window.tumblr={getCssMap:async()=>({}),on:()=>true,apiFetch:(r,i)=>Promise.resolve("+json.dumps(payload)+")};true")
-  c.ev(SCRIPT); c.wait("window.__TumblrUltraWideDeck?.version==='8.4.0'",8)
+  c.ev(SCRIPT); c.wait("window.__TumblrUltraWideDeck?.version==='8.5.0'",8)
   t0=time.perf_counter();c.ev("window.__p=window.tumblr.apiFetch('/api/v2/timeline/dashboard');true");time.sleep(.035);before_dom=c.ev("window.__TumblrUltraWideDeck.diagnostics()")
   dom=time.perf_counter();posts=''.join(f'<div tabindex="-1" data-id="{i}"><article><figure><img style="filter:blur(18px);opacity:.08" width="520" height="325" src="http://127.0.0.1:{port}/img/{i}/48.png"></figure><p>Post {i}</p><button>Like</button></article></div>' for i in range(1,41));c.ev("document.querySelector('main').innerHTML="+json.dumps(posts)+";true")
   c.wait("window.__TumblrUltraWideDeck.diagnostics().cachedPosts===40",10);c.ev("window.__TumblrUltraWideDeck.setSettings({columns:20})");c.wait("window.__TumblrUltraWideDeck.diagnostics().renderedColumns===20",6);c.wait("window.__TumblrUltraWideDeck.diagnostics().mediaQualityReady>=40",12)

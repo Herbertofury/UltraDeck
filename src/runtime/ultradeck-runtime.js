@@ -1,11 +1,11 @@
 export function startUltraDeck() {
-  if (globalThis.__UltraDeckExtensionRuntimeVersion === '8.4.0') return;
+  if (globalThis.__UltraDeckExtensionRuntimeVersion === '8.5.0') return;
   if (!globalThis.__UltraDeckSiteAdapter) return;
-  Object.defineProperty(globalThis, '__UltraDeckExtensionRuntimeVersion', { configurable:true, value:'8.4.0' });
+  Object.defineProperty(globalThis, '__UltraDeckExtensionRuntimeVersion', { configurable:true, value:'8.5.0' });
     'use strict';
 
     const ID = 'tu-ultrawide-deck';
-    const VERSION = '8.4.0';
+    const VERSION = '8.5.0';
     const SITE = globalThis.__UltraDeckSiteAdapter || Object.freeze({
         id: 'tumblr',
         label: 'Tumblr',
@@ -101,6 +101,9 @@ export function startUltraDeck() {
     const SITE_LOCATE_SOURCE = typeof SITE.locateSourceById === 'function' ? SITE.locateSourceById : null;
     const SITE_INVALIDATE_POST_ID = typeof SITE.invalidatePostId === 'function' ? SITE.invalidatePostId : null;
     const SITE_ACTION_ALIASES = SITE?.actionAliases && typeof SITE.actionAliases === 'object' ? SITE.actionAliases : Object.freeze({});
+    const SITE_INSTALL_RUNTIME_HOOKS = typeof SITE.installRuntimeHooks === 'function' ? SITE.installRuntimeHooks : null;
+    const SITE_RUNTIME_DIAGNOSTICS = typeof SITE.runtimeDiagnostics === 'function' ? SITE.runtimeDiagnostics : null;
+    const EXTENSION_RUNTIME = globalThis.__UltraDeckExtensionRuntimeVersion === VERSION;
 
     const siteRouteKey = () => {
         try { return String(SITE_ROUTE_KEY() || location.pathname); } catch { return location.pathname; }
@@ -259,6 +262,10 @@ export function startUltraDeck() {
         mediaQueueRunning: false,
         mediaSyncs: 0,
         mediaSkips: 0,
+        retainedVideoPlayable: 0,
+        retainedVideoDirectSources: 0,
+        retainedVideoBlobFallbacks: 0,
+        retainedVideoSourceRefreshes: 0,
         decodeQueue: [],
         decodeActive: 0,
         decodeCompleted: 0,
@@ -2354,6 +2361,66 @@ export function startUltraDeck() {
         } catch {}
     }
 
+    function retainedVideoSource(source) {
+        if (!(source instanceof HTMLVideoElement)) return '';
+        const candidates = [source.currentSrc, source.getAttribute('src'), ...[...source.querySelectorAll('source[src]')].map((item) => item.getAttribute('src'))];
+        let blobSeen = false;
+        for (const raw of candidates) {
+            const value = String(raw || '').trim();
+            if (!value) continue;
+            if (/^blob:/i.test(value)) { blobSeen = true; continue; }
+            try {
+                const url = new URL(value, document.baseURI || location.href);
+                if (/^https?:$/i.test(url.protocol) || /^data:$/i.test(url.protocol)) return url.href;
+            } catch {
+                if (/^data:/i.test(value)) return value;
+            }
+        }
+        return blobSeen ? 'blob:' : '';
+    }
+
+    function primeRetainedVideo(source, mirror) {
+        if (!(source instanceof HTMLVideoElement) || !(mirror instanceof HTMLVideoElement)) return false;
+        reserveMediaGeometry(source, mirror);
+        if (source.poster && mirror.poster !== source.poster) mirror.poster = source.poster;
+        mirror.autoplay = false;
+        mirror.removeAttribute('autoplay');
+        mirror.controls = true;
+        mirror.setAttribute('playsinline', '');
+        mirror.preload = 'metadata';
+        const selected = retainedVideoSource(source);
+        if (selected === 'blob:') {
+            if (/^blob:/i.test(String(mirror.currentSrc || mirror.getAttribute('src') || ''))) {
+                try { mirror.pause(); } catch {}
+                mirror.removeAttribute('src');
+                mirror.querySelectorAll('source[src^="blob:"]').forEach((item) => item.removeAttribute('src'));
+                try { mirror.load(); } catch {}
+            }
+            if (mirror.dataset.tuRetainedVideoState !== 'blob-fallback') state.retainedVideoBlobFallbacks += 1;
+            mirror.dataset.tuRetainedVideoState = 'blob-fallback';
+            mirror.dataset.tuRetainedVideoPlayable = '0';
+            return false;
+        }
+        if (!selected) {
+            mirror.dataset.tuRetainedVideoState = 'no-direct-source';
+            mirror.dataset.tuRetainedVideoPlayable = '0';
+            return false;
+        }
+        const current = String(mirror.currentSrc || mirror.getAttribute('src') || '');
+        if (current !== selected) {
+            mirror.src = selected;
+            state.retainedVideoSourceRefreshes += 1;
+        }
+        if (mirror.dataset.tuRetainedVideoPlayable !== '1') {
+            state.retainedVideoPlayable += 1;
+            state.retainedVideoDirectSources += 1;
+        }
+        mirror.dataset.tuRetainedVideoPlayable = '1';
+        mirror.dataset.tuRetainedVideoState = 'direct';
+        preconnectMedia(selected);
+        return true;
+    }
+
     function prepareMediaFast(record) {
         if (!(record?.source instanceof Element) || !record.clone) return;
         const srcImages = record.mediaHints?.sourceImages || [...record.source.querySelectorAll('img')];
@@ -2364,9 +2431,12 @@ export function startUltraDeck() {
         const srcVideos = record.mediaHints?.sourceVideos || [...record.source.querySelectorAll('video')];
         const dstVideos = record.clone[FAST_CLONE_VIDEOS] || [...record.clone.querySelectorAll('video')];
         for (let i = 0; i < Math.min(srcVideos.length, dstVideos.length); i += 1) {
-            reserveMediaGeometry(srcVideos[i], dstVideos[i]);
-            dstVideos[i].preload = 'metadata';
-            dstVideos[i].removeAttribute('autoplay');
+            if (siteCapability('retainedVideoPlayback')) primeRetainedVideo(srcVideos[i], dstVideos[i]);
+            else {
+                reserveMediaGeometry(srcVideos[i], dstVideos[i]);
+                dstVideos[i].preload = 'metadata';
+                dstVideos[i].removeAttribute('autoplay');
+            }
         }
         // The fast indexes exist only to fuse the initial traversals. Drop them immediately so the
         // retained card has no duplicate media index or additional long-lived references.
@@ -2439,10 +2509,14 @@ export function startUltraDeck() {
         const mirrorVideos = [...record.clone.querySelectorAll('video')];
         for (let i = 0; i < Math.min(sourceVideos.length, mirrorVideos.length); i += 1) {
             const src = sourceVideos[i], dst = mirrorVideos[i];
+            if (siteCapability('retainedVideoPlayback')) {
+                primeRetainedVideo(src, dst);
+                continue;
+            }
             reserveMediaGeometry(src, dst);
             if (src.poster && dst.poster !== src.poster) dst.poster = src.poster;
-            // Mirrors keep lightweight native media elements. Metadata avoids multiple video decoders
-            // competing with images while click-through actions remain native-backed where applicable.
+            // Non-video-first adapters keep lightweight mirror media. Native-backed controls remain
+            // the interaction path and metadata avoids unnecessary decoder competition.
             if (settings.turboMedia) {
                 dst.preload = 'metadata';
                 dst.autoplay = false;
@@ -3610,6 +3684,7 @@ export function startUltraDeck() {
         const hiddenTextRegions = full ? (state.grid?.querySelectorAll('[data-tu-text-only="1"]')?.length || 0) : (previous.hiddenTextRegions || 0);
         const revealedTextCards = full ? (state.grid?.querySelectorAll('.tu-item[data-tu-show-text="1"]')?.length || 0) : (previous.revealedTextCards || 0);
         const mediaPending = full ? ([...state.grid?.querySelectorAll('img') || []].filter((img) => !img.complete || img.naturalWidth <= 0).length) : Math.min(mediaQualityPending, previous.mediaPending ?? mediaQualityPending);
+        const retainedVideoPlayableCurrent = full ? (state.grid?.querySelectorAll('video[data-tu-retained-video-playable="1"]')?.length || 0) : (previous.retainedVideoPlayableCurrent || 0);
         state.diagnostics = {
             version: VERSION,
             site: SITE_ID,
@@ -3629,6 +3704,11 @@ export function startUltraDeck() {
             turboMedia: settings.turboMedia,
             mediaSyncs: state.mediaSyncs,
             mediaSkips: state.mediaSkips,
+            retainedVideoPlayable: state.retainedVideoPlayable,
+            retainedVideoPlayableCurrent,
+            retainedVideoDirectSources: state.retainedVideoDirectSources,
+            retainedVideoBlobFallbacks: state.retainedVideoBlobFallbacks,
+            retainedVideoSourceRefreshes: state.retainedVideoSourceRefreshes,
             mediaNativePrimes: state.mediaNativePrimes,
             mediaLoadHooks: state.mediaLoadHooks,
             mediaRefreshRuns: state.mediaRefreshRuns,
@@ -3782,6 +3862,9 @@ export function startUltraDeck() {
                 nativeInteractionWriterPending: state.nativeInteractionWriterPending,
                 nativeInteractionWriterActive: state.nativeInteractionWriterActive,
             });
+        }
+        if (SITE_RUNTIME_DIAGNOSTICS) {
+            try { Object.assign(state.diagnostics, SITE_RUNTIME_DIAGNOSTICS() || {}); } catch {}
         }
         return state.diagnostics;
     }
@@ -5988,13 +6071,42 @@ export function startUltraDeck() {
         }, 500);
     }
 
-    // Install at userscript document-start, not after boot. Capability gates ensure that
-    // media work as soon as React inserts an image node, often hundreds of milliseconds before the
-    // full multi-column deck has finished discovering rails and cloning the post.
-    if (siteCapability('staticTumblrMediaPreconnects')) installStaticMediaPreconnects();
-    installInstantMediaAttributeAccelerator();
-    if (siteCapability('tumblrNpfMedia')) { installNpfMediaAccelerator(); installTumblrApiFetchAccelerator(); }
-    installEarlyMediaAccelerator();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
-    else boot();
+    // Extension builds wait for the isolated-world bridge to publish the per-site gate. Userscripts
+    // remain self-contained and start immediately. This makes site toggles a true boot gate instead
+    // of a cosmetic setting applied after UltraDeck has already modified the page.
+    let enabledRuntimeStarted = false;
+    function startEnabledRuntime() {
+        if (enabledRuntimeStarted) return;
+        enabledRuntimeStarted = true;
+        if (SITE_INSTALL_RUNTIME_HOOKS) { try { SITE_INSTALL_RUNTIME_HOOKS(); } catch {} }
+        if (siteCapability('staticTumblrMediaPreconnects')) installStaticMediaPreconnects();
+        installInstantMediaAttributeAccelerator();
+        if (siteCapability('tumblrNpfMedia')) { installNpfMediaAccelerator(); installTumblrApiFetchAccelerator(); }
+        installEarlyMediaAccelerator();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
+        else void boot();
+    }
+    function siteGateValue() {
+        const value = document.documentElement?.dataset?.tuSiteEnabled;
+        if (value === '1') return true;
+        if (value === '0') return false;
+        return null;
+    }
+    if (!EXTENSION_RUNTIME) {
+        startEnabledRuntime();
+    } else {
+        const initialGate = siteGateValue();
+        if (initialGate === true) startEnabledRuntime();
+        else if (initialGate === null) {
+            const onSiteGate = (event) => {
+                let payload = null;
+                try { payload = JSON.parse(String(event?.detail || '{}')); } catch {}
+                const allowed = payload && typeof payload === 'object' ? payload.enabled !== false : siteGateValue() === true;
+                if (!allowed) return;
+                document.removeEventListener('ultradeck:site-gate', onSiteGate, true);
+                startEnabledRuntime();
+            };
+            document.addEventListener('ultradeck:site-gate', onSiteGate, true);
+        }
+    }
 }

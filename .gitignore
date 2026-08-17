@@ -4,3 +4,4 @@ dist/
 dist-manual/
 __pycache__/
 *.pyc
+src/

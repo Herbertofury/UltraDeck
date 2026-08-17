@@ -9,8 +9,14 @@ declare module 'wxt' {
 }
 declare module 'wxt/browser' {
   export const browser: {
-    storage: { local: { get(key: string): Promise<Record<string, unknown>>; set(value: Record<string, unknown>): Promise<void> } };
-    runtime: { onMessage: { addListener(fn: (message: any, sender?: any) => any): void } };
+    storage: {
+      local: { get(key: string): Promise<Record<string, unknown>>; set(value: Record<string, unknown>): Promise<void> };
+      onChanged: { addListener(fn: (changes: Record<string,{ oldValue?: unknown; newValue?: unknown }>, areaName: string) => void): void };
+    };
+    runtime: {
+      onMessage: { addListener(fn: (message: any, sender?: any) => any): void };
+      openOptionsPage(): Promise<void>;
+    };
     tabs: { query(query: Record<string, unknown>): Promise<Array<{id?: number; url?: string}>>; sendMessage(tabId: number, message: unknown): Promise<any> };
   };
 }

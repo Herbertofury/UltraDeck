@@ -1,0 +1,48 @@
+{
+  "version": "8.5.0",
+  "browser": {
+    "name": "Chromium",
+    "version": "144.0.7559.96",
+    "sha256": "ff97800d7edd3c84350c2c8559e176ea527a94feef6cc77ccaab67b33d7558a3",
+    "policy_isolated": true,
+    "host_policies_modified": false
+  },
+  "tiktok": {
+    "posts": 16,
+    "columns": 8,
+    "native_actions": ["like", "repost", "comment", "share"],
+    "retained_direct_video": true,
+    "forced_error_recovered": true,
+    "native_retry_clicks": 1,
+    "mirror_recoveries": 1,
+    "recovery_attempts": 1,
+    "recovery_successes": 1,
+    "geometry_violations": 0,
+    "interaction_failures": 0
+  },
+  "site_options": {
+    "sites": ["tumblr", "patreon", "x", "tiktok"],
+    "persistent": true,
+    "disabled_site_boot_blocked": true,
+    "reenable_reload_restored": true
+  },
+  "retention_gate": {
+    "cards": 2000,
+    "mounted": 2000,
+    "hidden": 0,
+    "content_visibility": 0,
+    "columns": 20,
+    "geometry_violations": 0,
+    "interaction_failures": 0,
+    "v84_ready_ms": 2068.1,
+    "v85_ready_ms": 2094.3
+  },
+  "regressions": {
+    "v83_interaction_capsules": "pass",
+    "v84_context_state": "pass",
+    "v82_jank_sites": "pass",
+    "manual_bridge_e2e": "pass",
+    "popup_ui": "pass",
+    "v8_multisite_extension": "executor_timeout_not_counted"
+  }
+}

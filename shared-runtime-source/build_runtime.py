@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = Path(__file__).resolve().parent
 BODY = (SHARED / 'ultradeck-runtime-body.js').read_text(encoding='utf-8').rstrip() + '\n'
-VERSION = '8.4.0'
+VERSION = '8.5.0'
 ADAPTERS = {
     'tumblr': {
         'label': 'Tumblr',
@@ -23,6 +23,12 @@ ADAPTERS = {
         'matches': ['https://x.com/*', 'https://twitter.com/*'],
         'namespace': 'https://x.com/',
     },
+    'tiktok': {
+        'label': 'TikTok',
+        'file': SHARED / 'adapters/tiktok.js',
+        'matches': ['https://www.tiktok.com/*', 'https://tiktok.com/*', 'https://*.tiktok.com/*'],
+        'namespace': 'https://www.tiktok.com/',
+    },
 }
 
 def adapter_source(site: str) -> str:
@@ -41,7 +47,7 @@ for site, info in ADAPTERS.items():
         f'// @name         {label} UltraWide Deck\n'
         f'// @namespace    {info["namespace"]}\n'
         f'// @version      {VERSION}\n'
-        f'// @description  UltraDeck v{VERSION}: lossless multi-column retained feed with native-backed off-screen interactions, HQ media, and shared multi-site framework.\n'
+        f'// @description  UltraDeck v{VERSION}: lossless multi-column retained feed with native-backed off-screen interactions, HQ media, TikTok playback recovery, and shared multi-site framework.\n'
         '// @author       Bert + ChatGPT\n'
         f'{match_lines}'
         '// @run-at       document-start\n'

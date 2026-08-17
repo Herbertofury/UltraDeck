@@ -1,0 +1,53 @@
+{
+  "version": "8.5.0",
+  "files": {
+    "Patreon-UltraWide-Deck-v8.5.0.user.js": {
+      "size": 347109,
+      "sha256": "0adfd747b9fab15b5495ba7c32e68c97d60c4473d4a5200f9985a1806eb245b6"
+    },
+    "TikTok-UltraWide-Deck-v8.5.0.user.js": {
+      "size": 359391,
+      "sha256": "6c662c706ed83660e3e54e1b17fe304ef185c54a22d0d8e70a93397f200dcea8"
+    },
+    "Tumblr-UltraWide-Deck-v8.5.0.user.js": {
+      "size": 344283,
+      "sha256": "7621e887f09113e69b4ef0fd1498149c8c946c7c6ad6910e486d99a0af03a5c0"
+    },
+    "X-UltraWide-Deck-v8.5.0.user.js": {
+      "size": 345683,
+      "sha256": "73c41f74a6dcb0c7f52a49206448e3d407f97918ae622ad8e3eb2fc913413730"
+    },
+    "UltraDeck-Extension-v8.5.0-chromium-mv3.zip": {
+      "size": 96849,
+      "sha256": "5042fdbd09810ac24eaef43f0363afb12aa7386dfc80bb9487f955da90534afb"
+    },
+    "UltraDeck-Extension-v8.5.0-firefox-mv3.zip": {
+      "size": 96915,
+      "sha256": "abaa9d2df610dfc6ff307805b4f06afdf3fa0b3edf0b16677f43b65142c704a5"
+    },
+    "UltraDeck-Extension-v8.5.0-source.zip": {
+      "size": 274449,
+      "sha256": "715096712096c6f799ac2216e182ee59dedf3bed25d9fe5b781b804c860606bd"
+    },
+    "VERIFICATION.md": {
+      "size": 4193,
+      "sha256": "570cfb17f3dc86cd2b4cf215c58053f3f0424c5fae8f5ce4a43f36488bfc32a2"
+    },
+    "VERIFICATION.json": {
+      "size": 1280,
+      "sha256": "75c69bbd144fe05a46a4fa8f22c259aaf0e8530ce2aba301448706f1f6b33bb5"
+    },
+    "SHA256SUMS.txt": {
+      "size": 897,
+      "sha256": "18dda60c4c1d57587efe0a8a26c452656fd63d3e524d4edccaf5b64a1bf0b020"
+    },
+    "UltraDeck-v8.5.0-release-bundle.zip": {
+      "size": 774772,
+      "sha256": "e3ebc3213eeca8a8cb366e6f2109c8d82e53a5ce10b317b4f875ff064ac5e5e3"
+    },
+    "BUNDLE-SHA256.txt": {
+      "size": 102,
+      "sha256": "07e107039fdce1622988785bb2627c1979c1fc977d759d593c7b36764f9f4966"
+    }
+  }
+}

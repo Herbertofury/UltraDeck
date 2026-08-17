@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.5.0 - 2026-08-17
+- Added a first-class TikTok adapter with canonical video identity, feed candidate discovery, native source recovery, and TikTok action aliases.
+- Added retained playable TikTok video cards for direct media URLs while keeping a safe fallback for blob/MSE-only playback sources.
+- Added bounded TikTok playback recovery for both native and retained videos: native Retry/Try Again first, then targeted media reload/play recovery for error, no-source, waiting, stalled, and watchdog-detected stuck playback states.
+- Added independent native/mirror playback observation using WeakSet identity so clone construction cannot copy a false already-observed marker.
+- Added real extension site enable/disable settings for Tumblr, Patreon, X/Twitter, and TikTok in both the options page and popup.
+- Site settings are true document-start boot gates. Disabled sites do not start the UltraDeck runtime or site-specific playback hooks, and changed settings reload only affected tabs.
+- Added real-browser TikTok interaction/playback recovery regression coverage and a real extension-options persistence/boot-gating regression.
+- Added deterministic reusable release packaging through `scripts/package_release.py`.
+- Preserved v8.3 Interaction Capsules, v8.4 persistent context, Patreon/X jank removal, and the full no-culling contract.
+
 ## 8.4.0 - 2026-08-17
 - Added persistent per-post interaction context on top of v8.3 Interaction Capsules.
 - Reply/comment/editor drafts are captured before native synchronization and survive source-card recycling, DOM wrapper changes, and matching-control reloads within the tab session.

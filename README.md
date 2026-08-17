@@ -1,57 +1,63 @@
-# UltraDeck v8.4.0
+# UltraDeck v8.5.0
 
-UltraDeck turns supported single-column social feeds into a lossless ultrawide multi-column deck for **Tumblr, Patreon, X, and Twitter compatibility URLs**. Every captured card stays mounted in the UltraDeck feed. v8.4 extends the native-backed Interaction Capsule system with persistent per-post contextual state so a recycled source card cannot erase what the user was doing.
+UltraDeck turns supported single-column social feeds into a lossless ultrawide multi-column deck for **Tumblr, Patreon, X/Twitter, and TikTok**. Every retained card stays mounted. Native-backed actions and per-post context remain usable even when the source site recycles its own feed DOM.
 
-## v8.4 persistent post context
+## TikTok in v8.5
 
-UltraDeck now keeps active interaction context attached to the retained post instead of treating a cloned card as disposable HTML.
+TikTok is now a first-class UltraDeck adapter rather than a generic fallback.
 
-- Reply/comment/editor draft values are captured immediately on `input`/`change` before any native-source recovery is attempted.
-- Drafts survive native virtualizer recycling and framework wrapper changes.
-- If a native remount removes an active contextual subtree such as an inline composer, UltraDeck keeps the retained subtree rather than replacing it with the incomplete remount.
-- Expanded/thread controls preserve `aria-expanded`, selected controls preserve `aria-selected`/`aria-checked`, polls preserve checked state, `<details>` keeps its open state, and common `data-state` open/active states are retained.
-- Menu trigger state is retained instead of being reset by source recycling.
-- Compact-text expansion is retained per post.
-- Active context is mirrored into `sessionStorage`, so matching contextual controls are restored after a same-tab reload or SPA navigation.
-- Password and file-input values are never captured into the context store.
-- A native submit/cancel/close action clears retained draft state instead of resurrecting an already-sent or discarded draft.
-- Input synchronization has the same hidden source-recovery/retry path as button actions, so a temporarily recycled source does not make the user retype the draft.
+- Detects TikTok feed posts from canonical `/@user/video/<id>` links, TikTok feed containers, and xgplayer identities.
+- Retains working Like, Repost, Comment/Reply, Share, Favorite/Bookmark, menu, poll, permalink, and input actions through the Interaction Capsule system.
+- Direct TikTok media URLs are retained as playable `<video>` elements with controls in the ultrawide card.
+- Blob/MSE-only media is not blindly duplicated into a second decoder. The retained card keeps the safe media fallback and native-backed actions while UltraDeck continues tracking the native player.
+- TikTok playback recovery watches both native and retained videos. On a playback error it prefers TikTok's own Retry/Try Again control, then uses bounded `HTMLMediaElement` reload/play recovery for network, decode, no-source, waiting, or stalled states.
+- A visible-video watchdog detects players that stop advancing while they are expected to be playing and attempts recovery without refreshing the whole page or mass-reloading healthy videos.
+- Recovery attempts are rate-limited per video so a permanently unavailable video cannot create a retry storm.
 
-Raw saved HTML is deliberately not the source of truth. HTML cannot preserve React/framework handlers. UltraDeck stores compact control identity and context, then reconnects it to the site's real live control when an action must execute.
+## Per-site enable/disable
 
-## Interaction Capsules
+The extension now has a real **Enabled sites** options page and matching quick toggles in the popup for:
 
-Use controls directly on the UltraDeck card. Like, Reblog/Repost, Reply/Comment, Share, bookmarks, polls, menus, inputs, and other retained controls reconnect to the matching native control in the background. If the site's virtualizer recycled the source post, UltraDeck silently restores it, rebinds the saved control even when wrapper DOM changed, and automatically replays the original intent. The deck scroll position stays fixed.
+- Tumblr
+- Patreon
+- X / Twitter
+- TikTok
+
+All sites are enabled by default. Disabling a site is a true runtime boot gate: UltraDeck does not create its deck, media accelerators, or TikTok playback hooks on that site. Changing a site's setting reloads only affected open tabs so the new state takes effect immediately.
+
+## Persistent native interaction
+
+Use controls directly on retained cards. Like, Reblog/Repost, Reply/Comment, Share, bookmarks, polls, menus, inputs, and other mapped controls reconnect to the site's real live controls. Active draft text, expanded/thread state, menus, poll selections, and related per-post context survive source-card recycling and same-tab reloads.
 
 ## Jank reduction without culling
 
-UltraDeck keeps the Nocturne-style jank-removal work from v8.2/v8.3 while preserving every retained card:
+UltraDeck preserves the Nocturne-style performance work from earlier releases:
 
 - scroll storms are animation-frame coalesced;
 - geometry audits are input-aware and time-sliced;
-- Patreon/X irrelevant `href` mutations are rejected before identity work;
-- Patreon/X exact source identities are cached;
-- rail and top-chrome discovery are scoped to semantic roots before fallbacks;
-- duplicate rail geometry reads and read/write/read layout chains are avoided;
-- repeated rail style writes are idempotent;
-- Patreon post permalinks are excluded from top-toolbar discovery;
-- contextual state capture is event-driven, not an eager per-card startup scan.
+- irrelevant Patreon/X identity mutations are rejected early;
+- exact source identities are cached;
+- rail and top-chrome discovery is scoped before fallback scanning;
+- repeated rail writes are idempotent;
+- interaction metadata is captured lazily where possible;
+- TikTok playback repair targets only failing/stalled media rather than restarting the feed.
 
 ## Non-negotiable retention contract
 
-Performance is **not** achieved with viewport virtualization, card culling, `content-visibility`, hidden retained posts, quantity caps, reduced media quality, or disabled off-screen controls. Retained cards stay mounted and actionable.
+Performance is **not** achieved with viewport virtualization, card culling, hidden retained posts, `content-visibility`, quantity caps, reduced media quality, or disabled off-screen controls. Retained cards stay mounted and actionable.
 
 ## Build
 
 ```text
 python3 shared-runtime-source/build_runtime.py
 python3 scripts/build_portable.py
+python3 scripts/package_release.py
 ```
 
 ## Install
 
-See `docs/INSTALL-OPTIONS.md`. Prebuilt Chromium/Firefox packages and standalone userscripts are published under `releases/v8.4.0/` and the GitHub v8.4.0 release.
+See `docs/INSTALL-OPTIONS.md`. The v8.5 release contains unified Chromium and Firefox packages plus standalone Tumblr, Patreon, X, and TikTok userscripts.
 
 ## Pinterest Nocturne reference
 
-Pinterest Nocturne 1.9.0 remains the recovered performance-design reference for the jank-removal approach. UltraDeck applies those ideas at its own shared runtime/adapter boundaries while preserving full retention, real native actions, and per-post context continuity.
+Pinterest Nocturne 1.9.0 remains a recovered performance-design reference for jank reduction. UltraDeck applies the relevant scheduling and hot-path ideas at its own shared runtime and adapter boundaries while preserving full retention, real native actions, per-post context continuity, and video playback behavior.

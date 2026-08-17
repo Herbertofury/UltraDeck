@@ -29,7 +29,7 @@ def main():
   posts=''.join(f'<div tabindex="-1" data-id="{i}"><article><p>Post {i}</p><button data-testid="like">Like</button></article></div>' for i in range(1,41))
   html=f'<!doctype html><html><head><base href="https://www.tumblr.com/"></head><body><nav role="navigation"><a href="/dashboard">Home</a><a href="/explore">Explore</a><a href="/communities">Communities</a><a href="/activity">Activity</a><a href="/messaging">Messages</a><a href="/inbox">Inbox</a><a href="/account">Account</a><a href="/settings">Settings</a></nav><main data-timeline="/v2/timeline/dashboard">{posts}</main><aside role="complementary"><h2>Radar</h2></aside></body></html>'
   c.ev("document.open();document.write("+json.dumps(html)+");document.close();true")
-  c.ev(SCRIPT+';true');c.wait("window.__TumblrUltraWideDeck?.version==='8.4.0'")
+  c.ev(SCRIPT+';true');c.wait("window.__TumblrUltraWideDeck?.version==='8.5.0'")
   def send(typ,val=None,req='x'):
    payload={'type':typ,'requestId':req}
    if val is not None: payload['value']=val

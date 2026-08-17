@@ -5,7 +5,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
 from policy_isolated_browser import ensure_isolated_browser, diagnostics as browser_diagnostics
 EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR', str(ROOT/'dist-manual/chromium-mv3'))).resolve()
-VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.4.0')
+VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.5.0')
 CERTDIR=pathlib.Path(tempfile.mkdtemp(prefix='ud-cert-'))
 import subprocess
 subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(CERTDIR/'key.pem'),'-out',str(CERTDIR/'cert.pem'),'-days','1','-subj','/CN=www.tumblr.com'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

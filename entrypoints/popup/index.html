@@ -3,18 +3,27 @@
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UltraDeck</title></head>
 <body>
   <main class="app">
-    <header><div><div class="eyebrow">MULTI-SITE EXPANSION ENGINE</div><h1>UltraDeck <span id="version">v8.4.0</span></h1></div><span class="status" id="status">Connecting</span></header>
+    <header><div><div class="eyebrow">MULTI-SITE EXPANSION ENGINE</div><h1>UltraDeck <span id="version">v8.5.0</span></h1></div><span class="status" id="status">Connecting</span></header>
     <section class="hero">
       <div><span id="posts">0</span><small>posts retained</small></div>
       <div><span id="cols">0</span><small>rendered columns</small></div>
       <div><span id="media">0</span><small>HQ ready</small></div>
     </section>
-    <section class="card">
+    <section class="card sites-card">
+      <div class="section-heading"><strong>Enabled sites</strong><button id="openOptions" class="link-button">OPTIONS</button></div>
+      <div class="site-toggles">
+        <label><span>Tumblr</span><input id="site-tumblr" data-site="tumblr" type="checkbox"></label>
+        <label><span>Patreon</span><input id="site-patreon" data-site="patreon" type="checkbox"></label>
+        <label><span>X</span><input id="site-x" data-site="x" type="checkbox"></label>
+        <label><span>TikTok</span><input id="site-tiktok" data-site="tiktok" type="checkbox"></label>
+      </div>
+    </section>
+    <section class="card deck-controls" id="deckControls">
       <label for="columns">Columns</label>
       <select id="columns"><option value="auto">Auto</option></select>
       <div class="buttons three"><button id="nav">NAV</button><button id="focus">FOCUS</button><button id="extras">EXTRAS</button></div>
     </section>
-    <section class="card compact-grid">
+    <section class="card compact-grid deck-controls">
       <label>Layout <select id="layout"><option value="masonry">Masonry</option><option value="rows">Aligned rows</option></select></label>
       <label>Images-first view <input id="mediaOnly" type="checkbox"></label>
       <label>Turbo media <input id="turbo" type="checkbox"></label>
@@ -22,9 +31,9 @@
       <label>Minimum card height <input id="minHeight" type="range" min="0" max="1200" step="20"><output id="minHeightOut"></output></label>
       <label>Gap <input id="gap" type="range" min="0" max="48" step="1"><output id="gapOut"></output></label>
     </section>
-    <section class="buttons three"><button id="sync">PRIORITIZE MEDIA</button><button id="rebalance">REBALANCE</button><button id="rescan">RESCAN</button></section>
+    <section class="buttons three deck-controls"><button id="sync">PRIORITIZE MEDIA</button><button id="rebalance">REBALANCE</button><button id="rescan">RESCAN</button></section>
     <details><summary>Live diagnostics</summary><pre id="diag"></pre></details>
-    <p class="hint" id="hint">Open Tumblr, Patreon, or X in the active tab to control UltraDeck.</p>
+    <p class="hint" id="hint">Open Tumblr, Patreon, X, or TikTok in the active tab to control UltraDeck.</p>
   </main>
   <script type="module" src="./main.ts"></script>
 </body>

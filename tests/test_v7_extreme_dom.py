@@ -2,7 +2,7 @@ import subprocess,tempfile,time,json,requests,websocket,pathlib,sys,os
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tests'))
 from policy_isolated_browser import ensure_isolated_browser
-VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.4.0')
+VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.5.0')
 SCRIPT=pathlib.Path(os.environ.get('ULTRADECK_USERSCRIPT_PATH',str(ROOT/f'dist/Tumblr-UltraWide-Deck-v{VERSION}.user.js'))).read_text()
 BASE=(ROOT/'tests/fixtures/tumblr_fixture.html').read_text()
 HTML=BASE.replace('<head>', '<head><base href="https://www.tumblr.com/"><style>.hardwide{width:540px!important;min-width:540px!important;max-width:none!important}.hostile-fixed{position:fixed;left:42vw;top:22vh;width:540px;z-index:999999}</style>')

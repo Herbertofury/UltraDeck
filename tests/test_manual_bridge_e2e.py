@@ -31,10 +31,11 @@ def main():
   nav=''.join(f'<a href="{p}">{n}</a>' for p,n in [('/dashboard','Home'),('/explore','Explore'),('/communities','Communities'),('/activity','Activity'),('/messaging','Messages'),('/inbox','Inbox'),('/account','Account'),('/settings','Settings')])
   html=f'<!doctype html><html><head><base href="https://www.tumblr.com/"></head><body><nav role="navigation">{nav}</nav><main data-timeline="/v2/timeline/dashboard">{posts}</main><aside role="complementary"><h2>Radar</h2></aside></body></html>'
   c.ev('document.open();document.write('+json.dumps(html)+');document.close();true')
-  # Mock exactly the extension APIs bridge.js consumes.
-  c.ev("globalThis.__listener=null;globalThis.__stored={};globalThis.chrome={storage:{local:{get:async(k)=>({}),set:async(v)=>{Object.assign(__stored,v);}}},runtime:{onMessage:{addListener:(fn)=>{__listener=fn;}}}};true")
-  c.ev(SITE+';true');c.ev(RUNTIME+';true');c.wait("window.__TumblrUltraWideDeck?.version==='8.4.0'")
-  c.ev(BRIDGE+';true');c.wait("typeof __listener==='function'")
+  # Mock exactly the extension APIs bridge.js consumes. Publish the site gate before the MAIN runtime.
+  c.ev("globalThis.__listener=null;globalThis.__stored={};globalThis.__storageListener=null;globalThis.chrome={storage:{local:{get:async(k)=>k==='ultradeckSites'?{ultradeckSites:{tumblr:true,patreon:true,x:true,tiktok:true}}:{},set:async(v)=>{Object.assign(__stored,v);}},onChanged:{addListener:(fn)=>{__storageListener=fn;}}},runtime:{onMessage:{addListener:(fn)=>{__listener=fn;}}}};true")
+  bridge_under_test=BRIDGE.replace("return null;})();","return'tumblr';})();")
+  c.ev(bridge_under_test+';true');c.wait("typeof __listener==='function' && document.documentElement.dataset.tuSiteEnabled==='1'")
+  c.ev(SITE+';true');c.ev(RUNTIME+';true');c.wait("window.__TumblrUltraWideDeck?.version==='8.5.0'")
   async_expr="""(async()=>{function send(m){return new Promise(resolve=>{const ret=__listener(m,{},resolve);if(ret!==true)resolve({ok:false,error:'listener did not keep channel open'})})}const a=await send({type:'setColumns',value:14});const b=await send({type:'toggleNav'});const c=await send({type:'toggleExtras'});const d=await send({type:'setSettings',value:{minCardWidth:270,minCardHeight:300,gap:10,layoutMode:'rows',mediaOnly:true,turboMedia:true}});return {a,b,c,d,diag:window.__TumblrUltraWideDeck.diagnostics(),navHidden:getComputedStyle(document.querySelector('nav')).display==='none',extraHidden:getComputedStyle(document.querySelector('aside')).display==='none',stored:__stored};})()"""
   out=c.ev(async_expr)
   c.wait("window.__TumblrUltraWideDeck.diagnostics().renderedColumns===14",5)

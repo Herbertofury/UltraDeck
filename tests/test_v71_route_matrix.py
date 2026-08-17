@@ -32,7 +32,7 @@ def main():
    targets=[x for x in requests.get(f'http://127.0.0.1:{dp}/json').json() if x['type']=='page']
    if targets:break
    time.sleep(.03)
-  c=C(targets[0]['webSocketDebuggerUrl']);c.call('Runtime.enable');c.ev('document.open();document.write('+json.dumps(HTML)+');document.close();true');c.wait('!!window.route');c.ev(SCRIPT);c.wait("window.__TumblrUltraWideDeck?.version==='8.4.0'");c.ev("window.__TumblrUltraWideDeck.setSettings({columns:8,layoutMode:'masonry',gap:10})")
+  c=C(targets[0]['webSocketDebuggerUrl']);c.call('Runtime.enable');c.ev('document.open();document.write('+json.dumps(HTML)+');document.close();true');c.wait('!!window.route');c.ev(SCRIPT);c.wait("window.__TumblrUltraWideDeck?.version==='8.5.0'");c.ev("window.__TumblrUltraWideDeck.setSettings({columns:8,layoutMode:'masonry',gap:10})")
   routes=['/dashboard/following','/dashboard/stuff_for_you','/dashboard/hubs','/explore/trending','/tagged/sims-4-download','/search/sims%204%20download']
   out=[]
   for path in routes:
