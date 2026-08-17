@@ -2,14 +2,12 @@ name: verify
 on:
   push:
   pull_request:
-permissions:
-  contents: read
 jobs:
   portable-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: python3 shared-runtime-source/build_runtime.py
@@ -21,8 +19,13 @@ jobs:
           root=pathlib.Path('.')
           for browser in ('chromium-mv3','firefox-mv3'):
               m=json.loads((root/'dist-manual'/browser/'manifest.json').read_text())
-              assert m['version']=='8.2.0'
+              assert m['version']=='8.4.0'
           body=(root/'shared-runtime-source/ultradeck-runtime-body.js').read_text()
           assert 'content-visibility' not in body.lower()
           assert 'identityMutationSkips' in body
+          assert 'interactionAutoRetries' in body
+          assert 'annotateInteractionMirror' in body
+          assert 'INTERACTION_CONTEXT_STORAGE_KEY' in body
+          assert 'missingStickyInteractionContext' in body
+          assert 'interactionDraftSyncRetries' in body
           PY
