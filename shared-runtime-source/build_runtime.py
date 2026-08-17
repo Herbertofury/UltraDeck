@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = Path(__file__).resolve().parent
 BODY = (SHARED / 'ultradeck-runtime-body.js').read_text(encoding='utf-8').rstrip() + '\n'
-VERSION = '8.2.0'
+VERSION = '8.4.0'
 ADAPTERS = {
     'tumblr': {
         'label': 'Tumblr',
@@ -30,6 +30,8 @@ def adapter_source(site: str) -> str:
 
 release = ROOT / 'dist'
 release.mkdir(parents=True, exist_ok=True)
+for stale in release.glob('*-UltraWide-Deck-v*.user.js'):
+    stale.unlink()
 
 for site, info in ADAPTERS.items():
     label = info['label']

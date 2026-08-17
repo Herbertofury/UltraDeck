@@ -34,7 +34,7 @@ def main():
   port=int(a.read_text().splitlines()[0]);page=next(x for x in requests.get(f'http://127.0.0.1:{port}/json').json() if x['type']=='page');c=C(page['webSocketDebuggerUrl']);c.call('Runtime.enable');c.call('Page.enable')
   body=HTML.replace('<link rel="stylesheet" href="popup.css">','<style>'+CSS+'</style>').replace('<script src="popup.js"></script>','')
   c.ev("document.open();document.write("+json.dumps(body)+");document.close();true")
-  c.ev("""globalThis.__messages=[];globalThis.__settings={columns:'auto',layoutMode:'masonry',mediaOnly:false,turboMedia:true,minCardWidth:320,minCardHeight:0,gap:16,leftOpen:true,rightOpen:true};globalThis.chrome={runtime:{},tabs:{query:async()=>[{id:42}],sendMessage:async(id,msg)=>{__messages.push(JSON.parse(JSON.stringify(msg)));if(msg.type==='setColumns')__settings.columns=msg.value;if(msg.type==='setSettings')Object.assign(__settings,msg.value||{});return {ok:true,payload:{version:'8.2.0',site:'tumblr',siteLabel:'Tumblr',settings:{...__settings},diagnostics:{cachedPosts:128,renderedColumns:Number(__settings.columns)||12,mediaQualityReady:118,mediaPreloadCompleted:118,interactionFailures:0,geometryViolations:0,layoutMode:__settings.layoutMode,minCardHeight:__settings.minCardHeight,mediaOnly:__settings.mediaOnly}}}}}};true""")
+  c.ev("""globalThis.__messages=[];globalThis.__settings={columns:'auto',layoutMode:'masonry',mediaOnly:false,turboMedia:true,minCardWidth:320,minCardHeight:0,gap:16,leftOpen:true,rightOpen:true};globalThis.chrome={runtime:{},tabs:{query:async()=>[{id:42}],sendMessage:async(id,msg)=>{__messages.push(JSON.parse(JSON.stringify(msg)));if(msg.type==='setColumns')__settings.columns=msg.value;if(msg.type==='setSettings')Object.assign(__settings,msg.value||{});return {ok:true,payload:{version:'8.4.0',site:'tumblr',siteLabel:'Tumblr',settings:{...__settings},diagnostics:{cachedPosts:128,renderedColumns:Number(__settings.columns)||12,mediaQualityReady:118,mediaPreloadCompleted:118,interactionFailures:0,geometryViolations:0,layoutMode:__settings.layoutMode,minCardHeight:__settings.minCardHeight,mediaOnly:__settings.mediaOnly}}}}}};true""")
   c.ev(JS+';true');c.wait("document.getElementById('status').textContent==='Live · Tumblr'")
   # Every visible control in scope is exercised.
   c.ev("document.getElementById('columns').value='16';document.getElementById('columns').dispatchEvent(new Event('change',{bubbles:true}));true");time.sleep(.12)
@@ -44,12 +44,12 @@ def main():
   c.ev("document.getElementById('nav').click();document.getElementById('focus').click();document.getElementById('extras').click();document.getElementById('sync').click();document.getElementById('rebalance').click();document.getElementById('rescan').click();true");time.sleep(.25)
   out=c.ev("({status:document.getElementById('status').textContent,version:document.getElementById('version').textContent,posts:document.getElementById('posts').textContent,media:document.getElementById('media').textContent,minHeightOut:document.getElementById('minHeightOut').textContent,messages:__messages,types:__messages.map(x=>x.type)})")
   print(json.dumps(out,indent=2))
-  assert out['status']=='Live · Tumblr' and out['version']=='v8.1.0' and out['posts']=='128' and out['media']=='118' and out['minHeightOut']=='360px'
+  assert out['status']=='Live · Tumblr' and out['version']=='v8.4.0' and out['posts']=='128' and out['media']=='118' and out['minHeightOut']=='360px'
   assert any(x['type']=='setColumns' and x.get('value')==16 for x in out['messages'])
   wanted=[{'layoutMode':'rows'},{'mediaOnly':True},{'turboMedia':False},{'minCardWidth':280},{'minCardHeight':360},{'gap':9}]
   for patch in wanted: assert any(x['type']=='setSettings' and all(x.get('value',{}).get(k)==v for k,v in patch.items()) for x in out['messages']),patch
   for typ in ['getState','toggleNav','toggleFocus','toggleExtras','syncMedia','rebalance','rescan']: assert typ in out['types'],typ
-  c.shot(str(PROJECT/'dist/UltraDeck-Extension-v8.1.0-popup.png'))
+  c.shot(str(PROJECT/'dist/UltraDeck-Extension-v8.4.0-popup.png'))
  finally:
   p.terminate();p.wait(timeout=5)
 if __name__=='__main__':main()

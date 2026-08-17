@@ -92,7 +92,7 @@
     routeKey() { return `${location.pathname}${location.search}`; },
     capabilities: Object.freeze({ rails:true,tumblrCssMap:false,tumblrNpfMedia:false,staticTumblrMediaPreconnects:false,nativeVirtualizer:true }),
     railHints: Object.freeze({ leftPaths:['/home','/memberships','/explore','/messages','/settings'], rightPhrases:[], rightSelectors:['aside[role="complementary"]'] }),
-    topChromeLinkSelector: 'a[href="/home"],a[href*="/memberships"],header nav a', utilityLinkSelector: 'a[href*="/posts"],a[href*="/search"],button[aria-label*="filter" i]',
+    topChromeLinkSelector: 'a[href="/home"],a[href*="/memberships"],header nav a', utilityLinkSelector: 'a[href*="/search"],button[aria-label*="filter" i]',
     actionAliases: Object.freeze({
       like:'[aria-label*="like" i],[data-testid*="like" i],button[title*="like" i]', menu:'[aria-label*="more" i],[aria-label*="options" i],[data-testid*="more" i]',
       comment:'[aria-label*="comment" i],[data-testid*="comment" i]', reply:'[aria-label*="comment" i],[aria-label*="reply" i],[data-testid*="comment" i]',

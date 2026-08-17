@@ -1,0 +1,93 @@
+{
+  "version": "8.3.0",
+  "browser": {
+    "name": "Chromium",
+    "version": "144.0.7559.96",
+    "sha256": "ff97800d7edd3c84350c2c8559e176ea527a94feef6cc77ccaab67b33d7558a3",
+    "policy_isolated": true,
+    "host_policies_modified": false
+  },
+  "interaction_capsules": {
+    "tumblr": {
+      "actions": [
+        "like",
+        "reblog",
+        "reply",
+        "share"
+      ],
+      "controls": 5,
+      "deck_scroll_delta": 0,
+      "geometry_failures": 0,
+      "interaction_failures": 0
+    },
+    "patreon": {
+      "actions": [
+        "like",
+        "repost",
+        "reply",
+        "share"
+      ],
+      "controls": 5,
+      "deck_scroll_delta": 0,
+      "geometry_failures": 0,
+      "interaction_failures": 0
+    },
+    "x": {
+      "actions": [
+        "like",
+        "repost",
+        "reply",
+        "share"
+      ],
+      "controls": 5,
+      "deck_scroll_delta": 0,
+      "geometry_failures": 0,
+      "interaction_failures": 0,
+      "auto_retries": 1,
+      "auto_retry_successes": 1
+    }
+  },
+  "identity_jank": {
+    "patreon_irrelevant_href_skips": 96,
+    "x_irrelevant_href_skips": 96,
+    "geometry_failures": 0,
+    "interaction_failures": 0
+  },
+  "scale_2000": {
+    "retained": 2000,
+    "hidden": 0,
+    "non_visible_content_visibility": 0,
+    "columns": 20,
+    "geometry_failures": 0,
+    "interaction_failures": 0,
+    "long_task_count": 7,
+    "long_task_ms": 2838,
+    "source_tree_ready_ms": 3252.9,
+    "fresh_release_zip_ready_ms": 3488.2
+  },
+  "unified_extension": {
+    "tumblr": {
+      "posts": 24,
+      "columns": 8,
+      "mounted_like": true,
+      "unmounted_like": true,
+      "deck_scroll_delta": 0
+    },
+    "patreon": {
+      "posts": 24,
+      "columns": 8,
+      "mounted_like": true,
+      "unmounted_like": true,
+      "deck_scroll_delta": 0
+    },
+    "x": {
+      "posts": 24,
+      "columns": 8,
+      "mounted_like": true,
+      "unmounted_like": true,
+      "deck_scroll_delta": 0
+    },
+    "popup_x_columns": 6,
+    "errors": []
+  }
+}

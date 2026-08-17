@@ -1,0 +1,8 @@
+594b898130be3212c068139936386697d63d1edd35ba4865182cab644970474e  Patreon-UltraWide-Deck-v8.4.0.user.js
+fd8cc783b52e6abec64808c907043a6f9556f637ef72a13e209bb7d3ea42cf5a  Tumblr-UltraWide-Deck-v8.4.0.user.js
+e723fc43218400277927501a3f40d7657dbc580c55d9dcdddbb9693d00b3d28f  X-UltraWide-Deck-v8.4.0.user.js
+bf1454d575c9e86a55bfbba6c1346f0adba0b726ccc176013120299d641cc2f8  UltraDeck-Extension-v8.4.0-chromium-mv3.zip
+7987b61305c08a96430f2233881773a3d02ab7df94c3260e015607aa53f39b57  UltraDeck-Extension-v8.4.0-firefox-mv3.zip
+c8e16294f1d06d27ac5f6ee5a3b2f6192229a083a751ec9da5e6c5fc1afa9352  UltraDeck-Extension-v8.4.0-source.zip
+889378987178dae657be9c4af1e984502d7828c1811d069bf1451df954e61c25  VERIFICATION.md
+558b29ad388bdfcdd64be383b22cadb9cd6d17eacc12c29adf97799b1223ff81  VERIFICATION.json

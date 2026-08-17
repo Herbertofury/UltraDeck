@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>UltraDeck Tumblr Virtualizer Fixture</title>
+<style>
+html,body{margin:0;background:#0b0b0d;color:#eee;font-family:Arial,sans-serif;min-height:100%}
+#topbar{position:fixed;top:0;left:0;right:0;height:70px;background:#111;z-index:5}
+nav{position:fixed;left:22px;top:90px;width:190px;padding:12px;background:#141416;border-radius:12px;z-index:4}
+nav a{display:block;color:#ddd;padding:10px;text-decoration:none}
+aside[aria-label="Sidebar"]{position:fixed;right:22px;top:90px;width:280px;padding:14px;background:#141416;border-radius:12px;z-index:4}
+#scrollspace{position:relative;width:1px;height:2500px}
+[data-timeline]{position:absolute;left:50%;width:540px;transform:translateX(-50%);top:110px;z-index:2}
+[data-id]{width:540px;margin:0 0 18px}
+article{background:#1b1b1e;border:1px solid #303036;border-radius:12px;overflow:hidden}
+.posthead,.actions,.postbody{padding:12px}.posthead{display:flex;justify-content:space-between}.postbody{padding-top:0}
+img{display:block;width:100%;height:auto;background:#333}.actions{display:flex;gap:8px}.actions button,.actions a{background:#29292e;color:#fff;border:0;border-radius:8px;padding:8px 10px;text-decoration:none;cursor:pointer}
+.extra{padding:10px;background:#25252a}.poll{padding:6px 10px;background:#34343b;color:#fff;border:0;border-radius:8px}
+</style></head>
+<body>
+<div id="topbar"></div>
+<nav role="navigation">
+<a href="/dashboard">Home</a><a href="/explore">Explore</a><a href="/communities">Communities</a><a href="/activity">Activity</a><a href="/messaging">Messages</a><a href="/inbox">Inbox</a><a href="/account">Account</a><a href="/settings">Settings</a>
+<button>Create</button>
+</nav>
+<aside aria-label="Sidebar"><h2>Check out these blogs</h2><p>Recommended A</p><a>Explore all of Tumblr</a><h2>Radar</h2><p>Radar card</p></aside>
+<div id="scrollspace"><main data-timeline="dashboard"></main></div>
+<script>
+(() => {
+  const PAGE = 8, STEP = 5200, MAX_BATCH = 24;
+  const timeline = document.querySelector('[data-timeline]');
+  const space = document.getElementById('scrollspace');
+  const events = [];
+  let maxBatch = 0, currentBatch = -1;
+  window.fixture = { events, get maxBatch(){return maxBatch}, get currentBatch(){return currentBatch} };
+  function makePost(id) {
+    const el = document.createElement('div');
+    el.tabIndex = -1; el.dataset.id = String(id);
+    el.innerHTML = `<article>
+      <div class="posthead"><strong>User ${id}</strong><button data-testid="caret">•••</button></div>
+      <div class="postbody"><p data-testid="body">Post ${id} body text. Click, expand, select, use controls.</p>
+      <img src="/img/${id}.svg" width="520" height="300" alt="fixture image ${id}">
+      <div class="extra" hidden data-extra>Expanded native content ${id}</div></div>
+      <div class="actions"><button data-testid="like" aria-pressed="false">Like</button><button data-testid="expand">Expand</button><button class="poll" data-testid="poll-answer">Poll A</button><a data-testid="permalink" href="/post/${id}">Permalink</a></div>
+      <div class="postbody"><label>Comment <input data-testid="comment-input" value=""></label></div>
+    </article>`;
+    return el;
+  }
+  function render(batch) {
+    batch = Math.max(0, Math.min(maxBatch, batch));
+    if (batch === currentBatch && timeline.children.length) return;
+    currentBatch = batch;
+    timeline.style.top = `${batch * STEP + 110}px`;
+    timeline.replaceChildren(...Array.from({length:PAGE},(_,i)=>makePost(batch*PAGE+i+1)));
+    events.push(['render', batch]);
+  }
+  function grow() {
+    space.style.height = `${(maxBatch + 1) * STEP + 2600}px`;
+  }
+  grow(); render(0);
+  let raf=0;
+  addEventListener('scroll', () => {
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(() => {
+      const y = scrollY;
+      const near = Math.floor((y + innerHeight * .35) / STEP);
+      if (y > maxBatch * STEP + 800 && maxBatch < MAX_BATCH) { maxBatch++; grow(); events.push(['grow',maxBatch]); }
+      render(Math.min(maxBatch, Math.max(0, near)));
+    });
+  }, {passive:true});
+  timeline.addEventListener('click', (e) => {
+    const post=e.target.closest('[data-id]'); if(!post)return; const id=post.dataset.id;
+    const caret=e.target.closest('[data-testid="caret"]'); if(caret){events.push(['menu',id]);return;}
+    const like=e.target.closest('[data-testid="like"]');
+    if(like){like.setAttribute('aria-pressed', like.getAttribute('aria-pressed')==='true'?'false':'true');like.textContent=like.getAttribute('aria-pressed')==='true'?'Liked':'Like';events.push(['like',id]);return;}
+    const exp=e.target.closest('[data-testid="expand"]'); if(exp){const x=post.querySelector('[data-extra]');x.hidden=!x.hidden;events.push(['expand',id]);return;}
+    const poll=e.target.closest('[data-testid="poll-answer"]'); if(poll){poll.textContent='Selected';events.push(['poll',id]);return;}
+    const link=e.target.closest('a[href]'); if(link){e.preventDefault();history.pushState({},'',link.getAttribute('href'));events.push(['route',id,location.pathname]);return;}
+    events.push(['cardclick',id]);
+  });
+  timeline.addEventListener('input', (e)=>{const post=e.target.closest('[data-id]');if(post)events.push(['input',post.dataset.id,e.target.value]);});
+})();
+</script>
+</body></html>

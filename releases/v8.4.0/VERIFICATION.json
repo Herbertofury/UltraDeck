@@ -1,0 +1,41 @@
+{
+  "version": "8.4.0",
+  "browser": {
+    "name": "Chromium",
+    "version": "144.0.7559.96",
+    "policyIsolated": true,
+    "hostPoliciesModified": false
+  },
+  "contextRegression": {
+    "sites": ["tumblr", "patreon", "x"],
+    "states": ["replyDraft", "expanded", "menu", "pollSelection"],
+    "nativeSourceRemoved": true,
+    "nativeTextareaRemoved": true,
+    "sameTabReloadRestored": true,
+    "deckScrollDelta": 0,
+    "interactionFailures": 0
+  },
+  "interactionCapsules": {
+    "tumblr": ["like", "reblog", "reply", "share"],
+    "patreon": ["like", "repost", "reply", "share"],
+    "x": ["like", "repost", "reply", "share"],
+    "xAutoRetry": true,
+    "interactionFailures": 0
+  },
+  "jankRegression": {
+    "patreonIdentityMutationSkips": 96,
+    "xIdentityMutationSkips": 96,
+    "geometryFailures": 0,
+    "interactionFailures": 0
+  },
+  "scaleGate": {
+    "cards": 2000,
+    "mounted": 2000,
+    "hidden": 0,
+    "contentVisibility": 0,
+    "columns": 20,
+    "geometryFailures": 0,
+    "interactionFailures": 0,
+    "readyMs": 2032.3
+  }
+}

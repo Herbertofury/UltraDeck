@@ -2,7 +2,7 @@ from __future__ import annotations
 import http.server,json,os,pathlib,socketserver,ssl,subprocess,sys,tempfile,threading,time
 from playwright.sync_api import sync_playwright
 ROOT=pathlib.Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'tests'))
-EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR',str(ROOT/'dist-manual/chromium-mv3'))).resolve();VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.2.0')
+EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR',str(ROOT/'dist-manual/chromium-mv3'))).resolve();VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.4.0')
 from policy_isolated_browser import ensure_isolated_browser,diagnostics as browser_diagnostics
 COUNT=2000
 POSTS=''.join(f'<div tabindex="-1" data-id="{i}"><article><div style="height:{120+(i*47)%420}px"></div><p>Post {i} {"body "*20 if i%5==0 else ""}</p><button>Like</button></article></div>' for i in range(1,COUNT+1))

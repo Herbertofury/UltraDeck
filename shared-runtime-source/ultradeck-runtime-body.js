@@ -1,7 +1,7 @@
     'use strict';
 
     const ID = 'tu-ultrawide-deck';
-    const VERSION = '8.2.0';
+    const VERSION = '8.4.0';
     const SITE = globalThis.__UltraDeckSiteAdapter || Object.freeze({
         id: 'tumblr',
         label: 'Tumblr',
@@ -39,7 +39,7 @@
     const ROUTE_ATTRIBUTES = Object.freeze([...new Set((SITE.routeAttributes || []).map(String).filter(Boolean))]);
     const OBSERVED_ATTRIBUTES = Object.freeze([...new Set([
         'src','srcset','sizes','poster','data-src','data-srcset','data-original','data-lazy-src','data-lazy-srcset',
-        'aria-pressed','aria-checked','class','hidden', ...IDENTITY_ATTRIBUTES, ...ROUTE_ATTRIBUTES,
+        'aria-pressed','aria-checked','aria-expanded','aria-selected','data-state','open','disabled','class','hidden', ...IDENTITY_ATTRIBUTES, ...ROUTE_ATTRIBUTES,
     ])]);
     const MAX_COLUMNS = 20;
 
@@ -206,6 +206,7 @@
         saved: new WeakMap(),
     });
 
+    const initialTopChrome = clamp(Number(SITE.topBaseline) || 76, 32, 190);
     const state = {
         cssMap: null,
         cssMapReady: false,
@@ -221,10 +222,10 @@
         sequence: 0,
         actualColumns: 1,
         renderedColumns: 0,
-        top: 92,
-        topChromeBottom: 84,
+        top: clamp(Math.round(initialTopChrome + 8), 72, 260),
+        topChromeBottom: initialTopChrome,
         topUtilityBottom: 0,
-        topAnchorSource: 'default',
+        topAnchorSource: 'baseline',
         topAnchorRoute: location.pathname,
         topAnchorReflows: 0,
         left: makeSideState(),
@@ -306,6 +307,23 @@
         interactionSourceWaits: 0,
         interactionControlPathHits: 0,
         interactionControlSignatureHits: 0,
+        interactionCapsules: 0,
+        interactionCapsuleControls: 0,
+        interactionCapsulePathHits: 0,
+        interactionContextCaptures: 0,
+        interactionContextRestores: 0,
+        interactionContextStickyPreserves: 0,
+        interactionContextSessionLoads: 0,
+        interactionContextSessionSaves: 0,
+        interactionDraftSyncRetries: 0,
+        interactionDraftSyncRetrySuccesses: 0,
+        interactionContextStore: null,
+        interactionContextSaveTimer: 0,
+        interactionAutoRetries: 0,
+        interactionAutoRetrySuccesses: 0,
+        interactionHoverPrewarms: 0,
+        interactionHoverTimer: 0,
+        interactionHoverKey: '',
         interactionProgrammaticActions: 0,
         interactionSeekProbes: 0,
         interactionSeekWindowMoves: 0,
@@ -512,9 +530,9 @@
         const style = document.createElement('style');
         style.id = `${ID}-style`;
         style.textContent = `
-            html[data-tu-v2="1"] { --tu-gap:16px; --tu-row:6px; --tu-radius:12px; --tu-min-card-height:0px; }
-            html[data-tu-v2="1"] body { overflow-x: clip !important; scrollbar-width:none !important; }
-            html[data-tu-v2="1"] body::-webkit-scrollbar { width:0 !important; height:0 !important; }
+            #${ID}-shell { --tu-gap:16px; --tu-row:6px; --tu-radius:12px; --tu-min-card-height:0px; }
+            body { overflow-x: clip !important; scrollbar-width:none !important; }
+            body::-webkit-scrollbar { width:0 !important; height:0 !important; }
             [data-tu-native-source="1"] { visibility:hidden !important; pointer-events:none !important; }
 
             #${ID}-shell {
@@ -568,13 +586,13 @@
                 contain:inline-size style !important;
                 position:relative !important;
             }
-            html[data-tu-layout="rows"] #${ID}-grid {
+            #${ID}-shell[data-tu-layout="rows"] #${ID}-grid {
                 display:grid !important;
                 grid-template-columns:repeat(var(--tu-cols,1),minmax(0,1fr)) !important;
                 gap:var(--tu-gap) !important;
                 align-items:start !important;
             }
-            html[data-tu-layout="rows"] #${ID}-grid > .tu-item { width:100% !important; min-width:0 !important; }
+            #${ID}-shell[data-tu-layout="rows"] #${ID}-grid > .tu-item { width:100% !important; min-width:0 !important; }
             #${ID}-grid [data-tu-mirror-post] {
                 position:relative !important;
                 inset:auto !important;
@@ -611,6 +629,8 @@
             #${ID}-grid [data-tu-mirror-post] :where(picture,figure,pre,blockquote) { max-width:100% !important; min-width:0 !important; }
             #${ID}-grid [data-tu-mirror-post] :where(pre,code) { overflow-wrap:anywhere !important; white-space:pre-wrap !important; }
             #${ID}-grid [data-tu-mirror-post] :where(button,a,[role="button"],[role="link"]) { min-width:0 !important; max-width:100% !important; }
+            #${ID}-grid [data-tu-mirror-post] [data-tu-action-kind] { visibility:visible !important; opacity:1 !important; pointer-events:auto !important; }
+            #${ID}-grid [data-tu-mirror-post] [data-tu-action-bar="1"] { visibility:visible !important; opacity:1 !important; pointer-events:auto !important; }
             #${ID}-grid [data-tu-mirror-post] :where(div,footer,header,section):has(> button),
             #${ID}-grid [data-tu-mirror-post] :where(div,footer,header,section):has(> [role="button"]) { flex-wrap:wrap !important; min-width:0 !important; max-width:100% !important; }
             #${ID}-grid [data-tu-mirror-post] :where(label):has(input,textarea,select) { display:flex !important; flex-wrap:wrap !important; min-width:0 !important; max-width:100% !important; }
@@ -620,8 +640,8 @@
             #${ID}-grid [data-tu-mirror-post] :where(img,video,canvas,svg,picture,figure) { max-inline-size:100% !important; }
             #${ID}-grid [data-tu-mirror-post] [data-tu-fixed-reset="1"] { position:relative !important; inset:auto !important; translate:none !important; transform:none !important; z-index:auto !important; }
             #${ID}-sentinel { width:100% !important; height:2px !important; margin:0 !important; padding:0 !important; pointer-events:none !important; opacity:0 !important; }
-            html[data-tu-compact="1"] #${ID}-grid p { line-height:1.34 !important; }
-            html[data-tu-media-only="1"] #${ID}-grid .tu-item:not([data-tu-show-text="1"]) [data-tu-text-only="1"] { display:none !important; }
+            #${ID}-shell[data-tu-compact="1"] #${ID}-grid p { line-height:1.34 !important; }
+            #${ID}-shell[data-tu-media-only="1"] #${ID}-grid .tu-item:not([data-tu-show-text="1"]) [data-tu-text-only="1"] { display:none !important; }
             .tu-text-peek {
                 display:none !important;
                 position:absolute !important;
@@ -642,7 +662,7 @@
                 box-shadow:0 6px 20px rgba(0,0,0,.35) !important;
                 cursor:pointer !important;
             }
-            html[data-tu-media-only="1"] #${ID}-grid .tu-item[data-tu-has-hidden-text="1"] > .tu-text-peek { display:block !important; }
+            #${ID}-shell[data-tu-media-only="1"] #${ID}-grid .tu-item[data-tu-has-hidden-text="1"] > .tu-text-peek { display:block !important; }
             .tu-buffer-card {
                 min-height:84px !important;
                 display:flex !important;
@@ -685,32 +705,52 @@
             }
             return found;
         };
-        // Every current use is right-rail discovery/verification. Search complementary regions first so
-        // hundreds of post descendants never enter JS on normal Tumblr pages. Keep the original
-        // document-wide search as a compatibility fallback for non-semantic/custom layouts.
+        // Search semantic/sidebar roots before considering a document-wide fallback. X commonly uses
+        // data-testid="sidebarColumn" without an aside element, so include adapter selectors here too.
+        // This keeps thousands of post descendants out of phrase matching on normal feeds.
+        const roots = new Set();
+        try { document.querySelectorAll('aside,[role="complementary"]').forEach((el) => roots.add(el)); } catch {}
+        for (const selector of RIGHT_SELECTORS) {
+            try { document.querySelectorAll(selector).forEach((el) => roots.add(el)); } catch {}
+        }
         const scoped = [];
-        for (const root of document.querySelectorAll('aside,[role="complementary"]')) {
-            if (state.shell?.contains(root)) continue;
+        for (const root of roots) {
+            if (!(root instanceof Element) || state.shell?.contains(root)) continue;
             matchInto(root, scoped);
             if (scoped.length > 40) break;
         }
-        if (scoped.length) return scoped.filter(rectVisible);
-        return matchInto(document, []).filter(rectVisible);
+        if (scoped.length) return scoped;
+        return matchInto(document, []);
+    }
+
+    function leftRailAnchors() {
+        if (!siteCapability('rails') || !LEFT_PATHS.size) return [];
+        const found = new Set();
+        const accept = (a) => {
+            if (!(a instanceof HTMLAnchorElement) || state.shell?.contains(a) || state.hud?.contains(a)) return;
+            if (LEFT_PATHS.has(normalizePath(a.getAttribute('href') || ''))) found.add(a);
+        };
+        // Normal site navigation is semantic. Scan its small anchor sets first instead of evaluating a
+        // long href-substring selector against the full retained feed DOM.
+        try {
+            for (const root of document.querySelectorAll('header,nav,[role="navigation"],aside')) {
+                if (!(root instanceof Element) || state.shell?.contains(root) || state.hud?.contains(root)) continue;
+                root.querySelectorAll('a[href]').forEach(accept);
+            }
+        } catch {}
+        if (found.size) return [...found];
+        // Compatibility fallback for non-semantic/custom navigation layouts.
+        try { document.querySelectorAll(LEFT_ANCHOR_HINT_SELECTOR).forEach(accept); } catch {}
+        if (found.size) return [...found];
+        try { document.querySelectorAll('a[href]').forEach(accept); } catch {}
+        return [...found];
     }
 
     function findLeftRail() {
-        // Navigation discovery must work while the rail is already display:none. Tumblr replaces SPA
-        // trees in that state, so visibility/geometry cannot be a prerequisite for rediscovery.
-        const collectAnchors = (selector) => [...document.querySelectorAll(selector)].filter((a) => {
-            if (state.shell?.contains(a) || state.hud?.contains(a)) return false;
-            return LEFT_PATHS.has(normalizePath(a.getAttribute('href') || ''));
-        });
+        // Navigation discovery must work while the rail is already display:none. Site SPAs can replace
+        // those trees while hidden, so visibility/geometry cannot be a prerequisite for rediscovery.
         if (!siteCapability('rails') || !LEFT_PATHS.size) return { frame:null, fragments:[] };
-        let anchors = collectAnchors(LEFT_ANCHOR_HINT_SELECTOR);
-        // Preserve compatibility with unusual/generated href formats that do not contain a literal
-        // known path even though URL normalization resolves to one. Normal Tumblr chrome never pays
-        // the document-wide fallback cost.
-        if (anchors.length < 2) anchors = collectAnchors('a[href]');
+        const anchors = leftRailAnchors();
         const frames = new Map();
         for (const anchor of anchors) {
             let node = anchor.closest('nav,[role="navigation"],aside');
@@ -728,11 +768,9 @@
             if (connected(node)) frames.set(node, (frames.get(node) || 0) + 1);
         }
         const ranked = [...frames.entries()].sort((a,b) => b[1] - a[1]);
-        let frame = ranked.find(([,count]) => count >= 3)?.[0] || ranked[0]?.[0] || null;
-        if (frame) {
-            const r = frame.getBoundingClientRect();
-            if (r.width > 0 && (r.width > 540 || r.left > innerWidth * .62)) frame = null;
-        }
+        // Do not force layout here. applyRail() already needs the frame rectangle and validates the
+        // measured side geometry before styling, so a second synchronous read only duplicates work.
+        const frame = ranked.find(([,count]) => count >= 3)?.[0] || ranked[0]?.[0] || null;
         const fragments = frame ? [frame] : topLevel(anchors.map((a) => a.closest('nav,[role="navigation"]') || a));
         return { frame, fragments: topLevel(fragments) };
     }
@@ -762,16 +800,12 @@
             const text = phrases.length ? lowText(aside) : '';
             const phraseScore = phrases.reduce((sum, phrase) => sum + (text.includes(phrase) ? 6 : 0), 0);
             const semanticScore = semantic.filter((node) => aside === node || aside.contains(node)).length;
-            const r = aside.getBoundingClientRect();
-            const visibleGeometryOkay = r.width <= 0 || (r.left >= innerWidth * .35 && r.width >= 150 && r.width <= 760);
-            if (visibleGeometryOkay && (phraseScore || semanticScore)) frames.set(aside, Math.max(frames.get(aside) || 0, phraseScore + semanticScore));
+            if (phraseScore || semanticScore) frames.set(aside, Math.max(frames.get(aside) || 0, phraseScore + semanticScore));
         }
         const ranked = [...frames.entries()].sort((a,b) => b[1] - a[1]);
-        let frame = ranked[0]?.[0] || null;
-        if (frame) {
-            const r = frame.getBoundingClientRect();
-            if (r.width > 0 && (r.left < innerWidth * .35 || r.width > 760)) frame = null;
-        }
+        // Geometry belongs to applyRail(), which validates the chosen side from the same rectangle
+        // snapshot used for positioning. Discovery stays structural and never forces layout itself.
+        const frame = ranked[0]?.[0] || null;
         const fragments = frame ? [frame] : topLevel([...seeds, ...semantic].map((seed) => seed.closest?.('aside,[role="complementary"]') || seed));
         return { frame, fragments: topLevel(fragments) };
     }
@@ -783,37 +817,69 @@
     }
     function setSavedStyle(bucket, element, prop, value, priority = 'important') {
         saveStyle(bucket, element, prop);
+        if (element.style.getPropertyValue(prop) === String(value) && element.style.getPropertyPriority(prop) === priority) return;
         element.style.setProperty(prop, value, priority);
     }
     function restoreSavedStyle(bucket, element, prop) {
         const original = bucket.get(element)?.get(prop);
-        if (!original || !original[0]) element.style.removeProperty(prop);
-        else element.style.setProperty(prop, original[0], original[1]);
+        const value = original?.[0] || '';
+        const priority = original?.[1] || '';
+        if (element.style.getPropertyValue(prop) === value && element.style.getPropertyPriority(prop) === priority) return;
+        if (!value) element.style.removeProperty(prop);
+        else element.style.setProperty(prop, value, priority);
     }
 
-    function applyRail(sideName) {
+    function prepareRail(sideName) {
         const side = state[sideName];
         const open = !settings.focus && (sideName === 'left' ? settings.leftOpen : settings.rightOpen);
         const elements = topLevel(side.frame ? [side.frame] : side.fragments);
-        if (!elements.length) { side.width = 0; return; }
         const bucket = side.saved;
+        // Restore both open rails before either side is measured. discoverRails() batches this prepare
+        // phase so the browser can resolve all display/style invalidations in one layout pass.
+        if (open) for (const el of elements) restoreSavedStyle(bucket, el, 'display');
+        return { sideName, side, open, elements, bucket };
+    }
 
+    function measureRail(prepared) {
+        const { sideName, elements } = prepared;
+        if (!prepared.open || !elements.length) return null;
+        const measured = [];
+        for (const el of elements) {
+            if (!connected(el)) continue;
+            const style = getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden') continue;
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 4 && rect.height > 4) measured.push([el, rect]);
+        }
+        if (!measured.length) return null;
+        const left = Math.min(...measured.map(([,r]) => r.left));
+        const right = Math.max(...measured.map(([,r]) => r.right));
+        const top = Math.min(...measured.map(([,r]) => r.top));
+        const naturalWidth = right - left;
+        if (sideName === 'left' && (naturalWidth > 540 || left > innerWidth * .62)) return null;
+        if (sideName === 'right' && (left < innerWidth * .35 || naturalWidth > 760)) return null;
+        return {
+            measured,
+            width: clamp(naturalWidth, sideName === 'left' ? 150 : 220, sideName === 'left' ? 460 : 640),
+            top: clamp(top, 8, 120),
+        };
+    }
+
+    function applyPreparedRail(prepared, snapshot) {
+        const { sideName, side, open, elements, bucket } = prepared;
+        if (!elements.length) { side.width = 0; return; }
         if (!open) {
             for (const el of elements) setSavedStyle(bucket, el, 'display', 'none');
             return;
         }
-        for (const el of elements) restoreSavedStyle(bucket, el, 'display');
-
-        const visible = elements.filter(rectVisible);
-        if (!visible.length) return;
-        const left = Math.min(...visible.map((e) => e.getBoundingClientRect().left));
-        const right = Math.max(...visible.map((e) => e.getBoundingClientRect().right));
-        const top = Math.min(...visible.map((e) => e.getBoundingClientRect().top));
-        side.width = clamp(right - left, sideName === 'left' ? 150 : 220, sideName === 'left' ? 460 : 640);
-        side.top = clamp(top, 8, 120);
+        if (!snapshot) { side.width = 0; return; }
+        side.width = snapshot.width;
+        side.top = snapshot.top;
+        const rectByElement = new Map(snapshot.measured);
 
         for (const el of elements) {
-            const r = el.getBoundingClientRect();
+            const r = rectByElement.get(el);
+            if (!r) continue;
             setSavedStyle(bucket, el, 'position', 'fixed');
             setSavedStyle(bucket, el, 'top', `${side.top}px`);
             setSavedStyle(bucket, el, 'bottom', 'auto');
@@ -830,9 +896,9 @@
             if (settings.softRails) setSavedStyle(bucket, el, 'opacity', '.82'); else restoreSavedStyle(bucket, el, 'opacity');
         }
 
-        // A transformed Tumblr ancestor can become the containing block of a fixed descendant.
-        // Do a few post-layout corrections against the *measured viewport* edge. Using an
-        // additive correction makes this converge even if Tumblr changes transforms between frames.
+        // A transformed ancestor can become the containing block of a fixed descendant. Corrections
+        // deliberately run after the write batch, outside the discovery task, so they cannot create a
+        // read/write/read layout chain on startup.
         const correctToViewport = () => {
             for (const el of elements.filter(connected)) {
                 if (getComputedStyle(el).display === 'none') continue;
@@ -853,6 +919,20 @@
         setTimeout(correctToViewport, 220);
     }
 
+    function applyRail(sideName) {
+        const prepared = prepareRail(sideName);
+        applyPreparedRail(prepared, measureRail(prepared));
+    }
+
+    function applyRails() {
+        const prepared = [prepareRail('left'), prepareRail('right')];
+        // Measure both sides before applying either side's fixed-position styles. This removes the old
+        // left-write -> right-read forced-layout chain on large feeds.
+        const measured = prepared.map(measureRail);
+        applyPreparedRail(prepared[0], measured[0]);
+        applyPreparedRail(prepared[1], measured[1]);
+    }
+
     function discoverRails(force = false) {
         const routeKey = location.pathname;
         const leftKnown = Boolean(state.left.frame || state.left.fragments.length);
@@ -864,8 +944,7 @@
         // A rail DOM mutation or route transition passes force=true, so absent/replaced rails still
         // recover immediately without repeatedly walking every anchor/aside in the document.
         if (!force && state.railDiscoveryComplete && state.railDiscoveryRoute === routeKey && !staleKnown) {
-            applyRail('left');
-            applyRail('right');
+            applyRails();
             updateGeometry();
             return;
         }
@@ -877,8 +956,7 @@
         else if (staleKnown && rightKnown) { state.right.frame = null; state.right.fragments = []; state.right.width = 0; }
         state.railDiscoveryRoute = routeKey;
         state.railDiscoveryComplete = true;
-        applyRail('left');
-        applyRail('right');
+        applyRails();
         updateGeometry();
     }
 
@@ -890,7 +968,7 @@
             if (getComputedStyle(el).display !== 'none') el.style.setProperty('display', 'none', 'important');
         }
         const leaked = sideName === 'left'
-            ? (LEFT_PATHS.size > 0 && [...document.querySelectorAll(LEFT_ANCHOR_HINT_SELECTOR)].some((a) => LEFT_PATHS.has(normalizePath(a.getAttribute('href') || '')) && rectVisible(a) && a.getBoundingClientRect().left < innerWidth * .48))
+            ? leftRailAnchors().some((a) => rectVisible(a) && a.getBoundingClientRect().left < innerWidth * .48)
             : (RIGHT_PHRASES.length ? exactSeeds(RIGHT_PHRASES).some(rectVisible) : RIGHT_SELECTORS.some((selector) => { try { return [...document.querySelectorAll(selector)].some(rectVisible); } catch { return false; } }));
         if (leaked) {
             const next = sideName === 'left' ? findLeftRail() : findRightRail();
@@ -1298,10 +1376,24 @@
     function refreshDeckMetrics() {
         const shell = state.shell;
         if (!shell?.isConnected) return;
+        const actualWidth = Math.max(1, shell.clientWidth - 4);
+        state.measuredShellWidth = actualWidth;
         state.deckScrollTop = shell.scrollTop || 0;
         state.deckClientHeight = shell.clientHeight || 0;
         state.deckScrollHeight = shell.scrollHeight || 0;
         state.deckRemaining = Math.max(0, state.deckScrollHeight - (state.deckScrollTop + state.deckClientHeight));
+        // Geometry updates use a viewport-derived width estimate so they never write shell offsets and
+        // immediately force layout by reading clientWidth. Reconcile the exact scrollbar-adjusted width
+        // here, after the deck is already usable or when a real scroll/diagnostic read needs metrics.
+        if (Math.abs(actualWidth - (state.layoutWidth || 0)) > 2) applyColumns(actualWidth);
+    }
+
+    function scheduleDeckMetrics(delay = 900) {
+        clearTimeout(state.deckMetricsTimer);
+        state.deckMetricsTimer = setTimeout(() => {
+            state.deckMetricsTimer = 0;
+            refreshDeckMetrics();
+        }, Math.max(0, delay));
     }
 
     function mediaPriority(record) {
@@ -2434,7 +2526,11 @@
             // A recovery/full scan commonly rediscovers the exact same React node. Attribute/load
             // observers already queue real media changes, so do not rescan every image just because
             // the post was seen again. A recycled/re-mounted native node still gets a full sync.
-            if (sourceChanged) queueMediaSync(record);
+            if (sourceChanged) {
+                record.nativeControlCache?.clear?.();
+                if (record.interactionCapsule?.controls?.size) captureInteractionCapsule(record, post, record.clone);
+                queueMediaSync(record);
+            }
             noteNativeCaptured(id);
             return false;
         }
@@ -2473,6 +2569,8 @@
         };
         state.cache.set(id, record);
         state.order.push(id);
+        annotateInteractionMirror(record, clone);
+        restoreInteractionContext(record, clone);
         syncTextPeek(record);
         if (post.isConnected) {
             post.dataset.tuNativeSource = '1';
@@ -2894,6 +2992,14 @@
             });
         }
         const geometryDone = performance.now();
+        // The first post geometry pass already forces the browser to resolve the native page layout.
+        // Reuse that clean layout for chrome/rail discovery before clone construction or rail writes
+        // can invalidate it. This removes the old document-wide pre-capture layout stall at boot.
+        const chromeRoute = location.pathname;
+        const topStale = state.topAnchorRoute !== chromeRoute || performance.now() - (state.lastTopDiscoveryAt || 0) >= 120;
+        const railsStale = !state.railDiscoveryComplete || state.railDiscoveryRoute !== chromeRoute;
+        if (sources.length && topStale) discoverTop();
+        if (sources.length && railsStale) discoverRails(true);
         const prepared = [];
         const existing = [];
         for (const source of sources) {
@@ -2929,15 +3035,7 @@
             candidates:candidates.length,
             added,
         };
-        if (candidates.length) {
-            state.lastCaptureAt = Date.now();
-            // Boot and the recovery timer both resolve the top immediately before scanning posts.
-            // Re-reading all chrome geometry in the same route/task only forces another layout. Keep
-            // full discovery when it is stale or the route changed; mutation observers still schedule
-            // top discovery immediately when relevant chrome/route controls are inserted or replaced.
-            const topFresh = state.topAnchorRoute === location.pathname && performance.now() - (state.lastTopDiscoveryAt || 0) < 120;
-            if (!topFresh) discoverTop(candidates);
-        }
+        if (candidates.length) state.lastCaptureAt = Date.now();
         if (added) {
             scheduleMasonry();
             updateHud();
@@ -2977,16 +3075,43 @@
         const centerX = innerWidth / 2;
         let best = 0;
         const roots = new Set();
-        const selector = [
-            'button','[role="button"]','input','select','textarea',
-            String(SITE.utilityLinkSelector || '').trim(),
-            '[role="tablist"]','form'
-        ].filter(Boolean).join(',');
-        let nodes = [];
-        try { nodes = [...document.querySelectorAll(selector)]; } catch {}
+        const nodes = new Set();
+        const addRoot = (el) => {
+            if (!(el instanceof HTMLElement) || state.shell?.contains(el) || state.hud?.contains(el)) return;
+            if (closestSourcePost(el) || el.closest('aside,[role="complementary"]')) return;
+            roots.add(el);
+        };
+        const addNode = (el) => {
+            if (!(el instanceof HTMLElement) || state.shell?.contains(el) || state.hud?.contains(el)) return;
+            if (closestSourcePost(el) || el.closest('aside,[role="complementary"]')) return;
+            nodes.add(el);
+        };
+        // Generic controls are only useful for deck-top discovery when they live in semantic chrome.
+        // Avoid querying every button/input in a large feed and rejecting post controls one by one.
+        try { document.querySelectorAll('header,nav,[role="navigation"],[role="tablist"],form').forEach(addRoot); } catch {}
+        const topSelector = String(SITE.topChromeLinkSelector || '').trim();
+        if (topSelector) {
+            try {
+                document.querySelectorAll(topSelector).forEach((el) => {
+                    addNode(el);
+                    let root = el;
+                    for (let i = 0; i < 4 && root?.parentElement; i += 1) {
+                        root = root.parentElement;
+                        if (root instanceof HTMLElement && !closestSourcePost(root)) addRoot(root);
+                    }
+                });
+            } catch {}
+        }
+        const utilitySelector = String(SITE.utilityLinkSelector || '').trim();
+        if (utilitySelector) {
+            try { document.querySelectorAll(utilitySelector).forEach(addNode); } catch {}
+        }
+        const controlSelector = 'button,[role="button"],input,select,textarea,a[href]';
+        for (const root of roots) {
+            addNode(root);
+            try { root.querySelectorAll(controlSelector).forEach(addNode); } catch {}
+        }
         for (const node of nodes) {
-            if (!(node instanceof HTMLElement) || state.shell?.contains(node) || state.hud?.contains(node)) continue;
-            if (closestSourcePost(node) || node.closest('aside,[role="complementary"]')) continue;
             const nr = node.getBoundingClientRect();
             if (nr.bottom <= chromeBottom || nr.top >= maxBottom || nr.width < 18 || nr.height < 12) continue;
             if (nr.right < centerX - 520 || nr.left > centerX + 520) continue;
@@ -3097,13 +3222,14 @@
                 }
             }, { root:shell, rootMargin:'120% 0px 180% 0px', threshold:0.001 });
         }
+        grid.addEventListener('pointerover', onMirrorPointerOver, true);
+        grid.addEventListener('pointerout', onMirrorPointerOut, true);
         grid.addEventListener('pointerdown', onMirrorPointerDown, true);
         grid.addEventListener('focusin', onMirrorFocusIn, true);
         grid.addEventListener('input', syncMirrorInput, true);
         grid.addEventListener('change', syncMirrorInput, true);
         grid.addEventListener('keydown', onMirrorKeyDown, true);
         grid.addEventListener('click', proxyInteractiveClick, true);
-        document.documentElement.dataset.tuV2 = '1';
         updateGeometry();
     }
 
@@ -3125,6 +3251,7 @@
         state.sourceWindowWaiters.clear();
         state.sourceWindowGeneration += 1;
         state.mountedSources.clear();
+        clearTimeout(state.interactionHoverTimer); state.interactionHoverTimer = 0; state.interactionHoverKey = '';
         state.interactionRegistryActive = false;
         state.virtualizerPixelsPerSequence = 0;
         state.virtualizerPixelsPerSequenceError = 0;
@@ -3409,9 +3536,13 @@
         collect();
     }
 
-    function applyColumns() {
+    function applyColumns(widthOverride = null) {
         if (!state.shell || !state.grid) return;
-        const width = Math.max(1, state.shell.clientWidth - 4);
+        const requestedWidth = Number(widthOverride);
+        const width = Number.isFinite(requestedWidth) && requestedWidth > 0
+            ? Math.max(1, requestedWidth)
+            : Math.max(1, state.layoutWidth || (innerWidth - (settings.gutter * 2) - 4));
+        state.layoutWidth = width;
         const previous = state.actualColumns || 1;
         const previousCardWidth = state.cardWidth || 0;
         const actual = settings.columns === 'auto'
@@ -3420,13 +3551,12 @@
         state.actualColumns = actual;
         state.cardWidth = Math.max(1, (width - settings.gap * Math.max(0, actual - 1)) / actual);
         state.grid.style.setProperty('--tu-cols', String(actual));
-        state.grid.style.setProperty('--tu-gap', `${settings.gap}px`);
-        document.documentElement.style.setProperty('--tu-gap', `${settings.gap}px`);
-        document.documentElement.style.setProperty('--tu-radius', `${settings.cardRadius}px`);
-        document.documentElement.style.setProperty('--tu-min-card-height', `${settings.minCardHeight}px`);
-        document.documentElement.dataset.tuCompact = settings.compact ? '1' : '0';
-        document.documentElement.dataset.tuMediaOnly = settings.mediaOnly ? '1' : '0';
-        document.documentElement.dataset.tuLayout = settings.layoutMode;
+        state.shell.style.setProperty('--tu-gap', `${settings.gap}px`);
+        state.shell.style.setProperty('--tu-radius', `${settings.cardRadius}px`);
+        state.shell.style.setProperty('--tu-min-card-height', `${settings.minCardHeight}px`);
+        state.shell.dataset.tuCompact = settings.compact ? '1' : '0';
+        state.shell.dataset.tuMediaOnly = settings.mediaOnly ? '1' : '0';
+        state.shell.dataset.tuLayout = settings.layoutMode;
         const structureMismatch = settings.layoutMode === 'rows'
             ? state.layoutMode !== 'rows'
             : state.layoutMode !== 'masonry' || state.columnEls.length !== actual;
@@ -3608,6 +3738,19 @@
                 interactionSourceWaits: state.interactionSourceWaits,
                 interactionControlPathHits: state.interactionControlPathHits,
                 interactionControlSignatureHits: state.interactionControlSignatureHits,
+                interactionCapsules: state.interactionCapsules,
+                interactionCapsuleControls: state.interactionCapsuleControls,
+                interactionCapsulePathHits: state.interactionCapsulePathHits,
+                interactionContextCaptures: state.interactionContextCaptures,
+                interactionContextRestores: state.interactionContextRestores,
+                interactionContextStickyPreserves: state.interactionContextStickyPreserves,
+                interactionContextSessionLoads: state.interactionContextSessionLoads,
+                interactionContextSessionSaves: state.interactionContextSessionSaves,
+                interactionDraftSyncRetries: state.interactionDraftSyncRetries,
+                interactionDraftSyncRetrySuccesses: state.interactionDraftSyncRetrySuccesses,
+                interactionAutoRetries: state.interactionAutoRetries,
+                interactionAutoRetrySuccesses: state.interactionAutoRetrySuccesses,
+                interactionHoverPrewarms: state.interactionHoverPrewarms,
                 interactionProgrammaticActions: state.interactionProgrammaticActions,
                 interactionSeekProbes: state.interactionSeekProbes,
                 interactionSeekWindowMoves: state.interactionSeekWindowMoves,
@@ -3857,11 +4000,15 @@
         const rightOpen = !settings.focus && settings.rightOpen && (state.right.frame || state.right.fragments.length);
         const left = leftOpen ? settings.gutter + state.left.width + settings.gap : settings.gutter;
         const right = rightOpen ? settings.gutter + state.right.width + settings.gap : settings.gutter;
-        state.shell.style.setProperty('--tu-shell-left', `${Math.max(settings.gutter, left)}px`);
-        state.shell.style.setProperty('--tu-shell-right', `${Math.max(settings.gutter, right)}px`);
+        const shellLeft = Math.max(settings.gutter, left);
+        const shellRight = Math.max(settings.gutter, right);
+        state.shell.style.setProperty('--tu-shell-left', `${shellLeft}px`);
+        state.shell.style.setProperty('--tu-shell-right', `${shellRight}px`);
         state.shell.style.setProperty('--tu-shell-top', `${state.top}px`);
-        applyColumns();
-        requestAnimationFrame(refreshDeckMetrics);
+        // The shell is fixed to viewport left/right offsets, so its usable width can be derived without
+        // a synchronous clientWidth read. Exact scrollbar-gutter width is reconciled later.
+        applyColumns(Math.max(1, innerWidth - shellLeft - shellRight - 4));
+        scheduleDeckMetrics(900);
     }
 
     function showToast(message) {
@@ -3971,8 +4118,9 @@
         if (cached) return cached;
         const path = elementPath(record.clone, mirrorNode);
         const sig = controlSignature(mirrorNode);
-        const key = JSON.stringify([path || [], sig.tag, sig.testid, sig.aria, sig.title, sig.href, sig.name, sig.role, sig.text]);
-        const descriptor = { path, sig, key };
+        const capsuleKey = mirrorNode.getAttribute('data-tu-control-key') || '';
+        const key = JSON.stringify([capsuleKey, path || [], sig.tag, sig.testid, sig.aria, sig.title, sig.href, sig.name, sig.role, sig.text]);
+        const descriptor = { path, sig, key, capsuleKey };
         record.mirrorControlDescriptors.set(mirrorNode, descriptor);
         return descriptor;
     }
@@ -3985,6 +4133,13 @@
         if (!record.nativeControlCache) record.nativeControlCache = new Map();
         const cached = record.nativeControlCache.get(descriptor.key);
         if (cached instanceof Element && cached.isConnected && source.contains(cached)) return cached;
+
+        const capsuleHit = capsuleEquivalentNode(record, descriptor, source);
+        if (capsuleHit) {
+            record.nativeControlCache.set(descriptor.key, capsuleHit);
+            state.interactionCapsulePathHits += 1;
+            return capsuleHit;
+        }
 
         const byPath = descriptor.path ? nodeAtPath(source, descriptor.path) : null;
         if (byPath && byPath.tagName === mirrorNode.tagName) {
@@ -4429,8 +4584,25 @@
         if (!record?.source?.isConnected || !record.item?.isConnected) return;
         const fresh = sanitizeClone(record.source.cloneNode(true), record.id);
         const old = record.clone;
-        if (old?.isConnected) old.replaceWith(fresh); else record.item.appendChild(fresh);
-        record.clone = fresh;
+        annotateInteractionMirror(record, fresh);
+        const missingSticky = old instanceof Element ? missingStickyInteractionContext(record, fresh) : 0;
+        if (missingSticky > 0 && old?.isConnected) {
+            // A virtualized remount can close an inline reply composer or remove another contextual
+            // subtree even though the retained card still owns live user state. Keep that exact mirror
+            // subtree instead of throwing the draft/expanded UI away, but merge current native button
+            // state so likes, reposts, bookmarks, disabled state, and counts do not become stale.
+            mergeFreshInteractiveState(record, fresh, old);
+            restoreInteractionContext(record, old);
+            record.nativeControlCache?.clear?.();
+            captureInteractionCapsule(record, record.source, old);
+            state.interactionContextStickyPreserves += 1;
+        } else {
+            if (old?.isConnected) old.replaceWith(fresh); else record.item.appendChild(fresh);
+            record.clone = fresh;
+            restoreInteractionContext(record, fresh);
+            record.nativeControlCache?.clear?.();
+            captureInteractionCapsule(record, record.source, fresh);
+        }
         syncTextPeek(record);
         syncMediaRecord(record);
         updateRecordMeasurement(record.item);
@@ -4449,6 +4621,8 @@
 
     const FULL_INTERACTIVE_SELECTOR = 'a[href],button,input,textarea,select,label,summary,details,[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="switch"],[role="menuitem"],[contenteditable="true"],[data-testid]';
     const TEXT_EDIT_SELECTOR = 'input:not([type="button"]):not([type="submit"]):not([type="reset"]),textarea,select,[contenteditable="true"]';
+    const INTERACTION_CONTEXT_STORAGE_KEY = `${ID}:context:${SITE_ID}:v1`;
+    const CONTEXT_STATE_ATTRS = Object.freeze(['aria-expanded','aria-selected','aria-checked','aria-pressed','data-state']);
     const ACTION_STAGE_PROPS = ['translate','visibility','opacity','pointer-events','z-index','transform'];
 
     function restoreActionStage() {
@@ -4556,14 +4730,28 @@
         state.interactionAnchorPixels += Math.abs(delta);
     }
 
-    async function nativeEquivalent(record, mirrorTarget, { stage = 'auto' } = {}) {
+    function interactionTimeoutFor(record, base = 3200) {
+        const live = mountedSequenceWindow();
+        if (!record || !Number.isFinite(record.sequence) || !live) return base;
+        const distance = record.sequence < live.min ? live.min - record.sequence : record.sequence > live.max ? record.sequence - live.max : 0;
+        return clamp(Math.round(base + distance * 9), base, 6800);
+    }
+
+    async function nativeEquivalent(record, mirrorTarget, { stage = 'auto', timeout = null } = {}) {
         if (!settings.liveInteraction || !record) return null;
         const shouldStage = stage === true || (stage === 'auto' && mirrorTargetInDeckViewport(mirrorTarget));
-        if (shouldStage) acquireNativeInteractionLease(2100);
-        const source = await ensureSourceMounted(record);
+        const mountTimeout = Number.isFinite(timeout) ? timeout : interactionTimeoutFor(record);
+        if (shouldStage) acquireNativeInteractionLease(Math.max(2400, mountTimeout + 600));
+        const source = await ensureSourceMounted(record, mountTimeout);
         if (!source) return null;
-        if (shouldStage) acquireNativeInteractionLease(1900);
-        const actual = findEquivalentNode(record, mirrorTarget);
+        if (shouldStage) acquireNativeInteractionLease(Math.max(2100, Math.min(4200, mountTimeout)));
+        let actual = findEquivalentNode(record, mirrorTarget);
+        if (!actual) {
+            // The source may have remounted with a different framework-generated wrapper shape. Rebind
+            // the saved interaction capsule against the current native DOM before declaring failure.
+            captureInteractionCapsule(record, source, record.clone);
+            actual = findEquivalentNode(record, mirrorTarget);
+        }
         if (!actual) return null;
         return shouldStage ? stageNativeControl(actual, mirrorTarget) : actual;
     }
@@ -4573,11 +4761,51 @@
         return mirror ? state.cache.get(mirror.dataset.tuMirrorPost) || null : null;
     }
 
-    function onMirrorPointerOver() {}
-    function onMirrorPointerOut() {}
+    function interactionActionKind(element) {
+        if (!(element instanceof Element)) return '';
+        const tagged = element.getAttribute('data-tu-action-kind') || '';
+        if (tagged) return tagged;
+        for (const [kind, selector] of Object.entries(RETAINED_ACTION_SELECTORS)) {
+            if (kind === 'input' || kind === 'permalink') continue;
+            try { if (element.matches(selector)) return kind; } catch {}
+        }
+        return '';
+    }
 
-    function prewarmInteractionSource(record) {
+    function onMirrorPointerOver(event) {
+        if (!settings.liveInteraction) return;
+        const target = event.target instanceof Element ? event.target.closest(FULL_INTERACTIVE_SELECTOR) : null;
+        if (!target || target.matches(TEXT_EDIT_SELECTOR)) return;
+        const kind = interactionActionKind(target);
+        if (!kind) return;
+        const record = mirrorRecordFromNode(target);
+        if (!record || locateMountedSource(record.id)) return;
+        const key = `${record.id}:${target.getAttribute('data-tu-control-key') || kind}`;
+        if (state.interactionHoverKey === key && state.interactionHoverTimer) return;
+        clearTimeout(state.interactionHoverTimer);
+        state.interactionHoverKey = key;
+        state.interactionHoverTimer = setTimeout(() => {
+            state.interactionHoverTimer = 0;
+            if (state.interactionHoverKey !== key || locateMountedSource(record.id)) return;
+            state.interactionHoverPrewarms += 1;
+            prewarmInteractionSource(record, Math.min(4200, interactionTimeoutFor(record, 2600)))?.catch?.(() => {});
+        }, 180);
+    }
+
+    function onMirrorPointerOut(event) {
+        if (!state.interactionHoverTimer) return;
+        const from = event.target instanceof Element ? event.target.closest(FULL_INTERACTIVE_SELECTOR) : null;
+        if (!from) return;
+        const to = event.relatedTarget instanceof Element ? event.relatedTarget.closest(FULL_INTERACTIVE_SELECTOR) : null;
+        if (to === from || from.contains(to)) return;
+        clearTimeout(state.interactionHoverTimer);
+        state.interactionHoverTimer = 0;
+        state.interactionHoverKey = '';
+    }
+
+    function prewarmInteractionSource(record, timeout = 1900) {
         if (!settings.liveInteraction || !record) return null;
+        ensureInteractionCapsule(record);
         const mounted = locateMountedSource(record.id);
         if (mounted) {
             record.source = mounted;
@@ -4586,7 +4814,7 @@
         }
         if (record.interactionIntentPrewarm) return record.interactionIntentPrewarm;
         state.interactionIntentPrewarms += 1;
-        const flight = runNativeInteractionTransaction(record, () => ensureSourceMounted(record, 1900)).finally(() => {
+        const flight = runNativeInteractionTransaction(record, () => ensureSourceMounted(record, timeout)).finally(() => {
             if (record.interactionIntentPrewarm === flight) record.interactionIntentPrewarm = null;
         });
         record.interactionIntentPrewarm = flight;
@@ -4613,12 +4841,22 @@
         if (!target) return;
         const record = mirrorRecordFromNode(target);
         if (!record) return;
+        rememberInteractionContext(record, target, { edited:true });
         if (!record.inputSyncGenerations) record.inputSyncGenerations = new WeakMap();
         const generation = (record.inputSyncGenerations.get(target) || 0) + 1;
         record.inputSyncGenerations.set(target, generation);
         return runNativeInteractionTransaction(record, async () => {
             if (record.inputSyncGenerations.get(target) !== generation) return;
-            const actual = await nativeEquivalent(record, target, { stage:false });
+            let actual = await nativeEquivalent(record, target, { stage:false });
+            if (record.inputSyncGenerations.get(target) !== generation) return;
+            if (!actual) {
+                state.interactionDraftSyncRetries += 1;
+                record.nativeControlCache?.clear?.();
+                const source = await restoreSourceForInteraction(record, interactionTimeoutFor(record, 2600));
+                if (source) captureInteractionCapsule(record, source, record.clone);
+                actual = await nativeEquivalent(record, target, { stage:false, timeout:1400 });
+                if (actual) state.interactionDraftSyncRetrySuccesses += 1;
+            }
             if (record.inputSyncGenerations.get(target) !== generation) return;
             if (!actual) { state.interactionFailures += 1; return; }
             try {
@@ -4637,14 +4875,13 @@
         if (event.key === 'Escape') restoreActionStage();
     }
 
-    async function executeMirrorActionCore(record, target, { programmatic = false } = {}) {
+    async function executeMirrorActionCore(record, target, { programmatic = false, timeout = null } = {}) {
         if (!record || !(target instanceof Element)) return { ok:false, reason:'missing-target' };
         const offscreen = !mirrorTargetInDeckViewport(target);
         const deckAnchor = offscreen ? captureDeckInteractionAnchor() : null;
-        const actual = await nativeEquivalent(record, target, { stage:'auto' });
+        const actual = await nativeEquivalent(record, target, { stage:'auto', timeout });
         if (!actual) {
-            state.interactionFailures += 1;
-            return { ok:false, reason:'native-source-unavailable', id:record.id };
+            return { ok:false, reason:locateMountedSource(record.id) ? 'native-control-unavailable' : 'native-source-unavailable', id:record.id };
         }
         try {
             if (programmatic) state.interactionProgrammaticActions += 1;
@@ -4655,6 +4892,8 @@
             const stateful = Boolean(
                 sig.testid && /like|expand|poll|answer|follow|bookmark|subscribe|toggle/i.test(sig.testid)
                 || target.hasAttribute('aria-pressed') || target.hasAttribute('aria-checked')
+                || target.hasAttribute('aria-expanded') || target.hasAttribute('aria-selected')
+                || target instanceof HTMLDetailsElement || target instanceof HTMLElement && target.tagName === 'SUMMARY'
                 || /checkbox|radio|switch/.test(sig.role)
             );
             if (stateful) {
@@ -4662,16 +4901,29 @@
                 // A queued far-post action therefore cannot recycle this source between the exact
                 // native click and mirror reconciliation.
                 await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+                rememberNativeInteractionContext(record, target, actual);
+                const actionKind = interactionActionKind(target);
+                if (actionKind === 'submit' || actionKind === 'dismiss') clearInteractionContext(record, { drafts:true });
                 if (record.source?.isConnected) {
                     refreshMirrorFromSource(record);
                     restoreDeckInteractionAnchor(deckAnchor);
                 }
                 setTimeout(() => {
+                    if (actual?.isConnected) rememberNativeInteractionContext(record, target, actual);
                     if (record.source?.isConnected) refreshMirrorFromSource(record);
                     restoreDeckInteractionAnchor(deckAnchor);
                 }, 120);
             } else if (!sig.href && !/caret|menu|more|options/i.test(`${sig.testid} ${sig.aria} ${sig.title}`)) {
                 setTimeout(() => {
+                    if (actual?.isConnected) rememberNativeInteractionContext(record, target, actual);
+                    const actionKind = interactionActionKind(target);
+                    if (actionKind === 'submit' || actionKind === 'dismiss') clearInteractionContext(record, { drafts:true });
+                    if (record.source?.isConnected) refreshMirrorFromSource(record);
+                    restoreDeckInteractionAnchor(deckAnchor);
+                }, 80);
+            } else {
+                setTimeout(() => {
+                    if (actual?.isConnected) rememberNativeInteractionContext(record, target, actual);
                     if (record.source?.isConnected) refreshMirrorFromSource(record);
                     restoreDeckInteractionAnchor(deckAnchor);
                 }, 80);
@@ -4686,7 +4938,27 @@
 
     async function executeMirrorAction(record, target, options = {}) {
         if (!record || !(target instanceof Element)) return { ok:false, reason:'missing-target' };
-        return runNativeInteractionTransaction(record, () => executeMirrorActionCore(record, target, options));
+        ensureInteractionCapsule(record);
+        return runNativeInteractionTransaction(record, async () => {
+            const firstTimeout = interactionTimeoutFor(record, 3200);
+            let result = await executeMirrorActionCore(record, target, { ...options, timeout:firstTimeout });
+            if (result.ok) return result;
+            if (!['native-source-unavailable','native-control-unavailable'].includes(result.reason)) return result;
+            // One physical click is one user intent. If a far virtualized source was not available on
+            // the first bounded seek, continue the hidden native restore automatically and replay the
+            // exact saved capsule control. Never ask the user to scroll back or click a second time.
+            state.interactionAutoRetries += 1;
+            record.nativeControlCache?.clear?.();
+            const source = await restoreSourceForInteraction(record, Math.min(7600, Math.max(3600, firstTimeout + 1800)));
+            if (source) captureInteractionCapsule(record, source, record.clone);
+            result = await executeMirrorActionCore(record, target, { ...options, timeout:1800 });
+            if (result.ok) {
+                state.interactionAutoRetrySuccesses += 1;
+                return result;
+            }
+            if (['native-source-unavailable','native-control-unavailable'].includes(result.reason)) state.interactionFailures += 1;
+            return result;
+        });
     }
 
     const RETAINED_ACTION_SELECTORS = Object.freeze({
@@ -4694,6 +4966,8 @@
         menu:'[data-testid="caret"],[aria-label*="more" i],[aria-label*="options" i]',
         poll:'[data-testid="poll-answer"],[role="radio"]',
         expand:'[data-testid="expand"],summary,[aria-expanded]',
+        dismiss:'[data-testid*="cancel" i],[data-testid*="close" i],[aria-label*="cancel" i],[aria-label*="close" i]',
+        submit:'button[type="submit"],[data-testid*="submit" i],[data-testid*="send" i]',
         permalink:'a[href]',
         input:'textarea,input:not([type="button"]):not([type="submit"]):not([type="reset"]),[contenteditable="true"]',
         ...siteActionAliases(),
@@ -4701,6 +4975,355 @@
 
     function normalizeControlTerm(value) {
         return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function interactionSignatureScore(a, b) {
+        if (!a || !b || a.tag !== b.tag) return 0;
+        let score = 8;
+        const pairs = [
+            ['testid', 120], ['aria', 108], ['title', 92], ['name', 86], ['href', 82], ['role', 54], ['text', 36],
+        ];
+        for (const [field, weight] of pairs) {
+            const av = normalizeControlTerm(a[field]);
+            const bv = normalizeControlTerm(b[field]);
+            if (!av || !bv) continue;
+            if (av === bv) score += weight;
+            else if (av.includes(bv) || bv.includes(av)) score += Math.floor(weight * .42);
+        }
+        return score;
+    }
+
+    function interactionControlState(element) {
+        return {
+            pressed:element.getAttribute?.('aria-pressed') || '',
+            ariaChecked:element.getAttribute?.('aria-checked') || '',
+            disabled:Boolean(element.disabled || element.getAttribute?.('aria-disabled') === 'true'),
+            checked:'checked' in element ? Boolean(element.checked) : undefined,
+            value:'value' in element && !element.matches?.('input[type="password"]') ? String(element.value ?? '').slice(0, 400) : undefined,
+        };
+    }
+
+    function annotateInteractionMirror(record, mirrorRoot = record?.clone) {
+        if (!record || !(mirrorRoot instanceof Element)) return [];
+        const mirrorControls = [...mirrorRoot.querySelectorAll(FULL_INTERACTIVE_SELECTOR)].filter((el) => el instanceof Element);
+        for (let index = 0; index < mirrorControls.length; index += 1) {
+            const mirror = mirrorControls[index];
+            mirror.setAttribute('data-tu-control-key', String(index));
+            let kind = '';
+            for (const [action, selector] of Object.entries(RETAINED_ACTION_SELECTORS)) {
+                if (action === 'input') continue;
+                try { if (mirror.matches(selector)) { kind = action; break; } } catch {}
+            }
+            if (kind) {
+                mirror.setAttribute('data-tu-action-kind', kind);
+                const actionParent = mirror.parentElement;
+                if (actionParent && actionParent.querySelectorAll(FULL_INTERACTIVE_SELECTOR).length >= 2) actionParent.setAttribute('data-tu-action-bar', '1');
+            }
+        }
+        record.interactionMirrorCount = mirrorControls.length;
+        return mirrorControls;
+    }
+
+    function ensureInteractionCapsule(record) {
+        if (!record) return null;
+        if (record.interactionCapsule?.controls?.size) return record.interactionCapsule;
+        const source = locateMountedSource(record.id) || record.source;
+        if (!(source instanceof Element) || !(record.clone instanceof Element)) return null;
+        return captureInteractionCapsule(record, source, record.clone);
+    }
+
+    function captureInteractionCapsule(record, sourceRoot = record?.source, mirrorRoot = record?.clone) {
+        if (!record || !(sourceRoot instanceof Element) || !(mirrorRoot instanceof Element)) return null;
+        const nativeControls = [...sourceRoot.querySelectorAll(FULL_INTERACTIVE_SELECTOR)].filter((el) => el instanceof Element);
+        const mirrorControls = annotateInteractionMirror(record, mirrorRoot);
+        const native = nativeControls.map((element, index) => ({
+            index,
+            sig:controlSignature(element),
+            state:interactionControlState(element),
+        }));
+        const controls = new Map();
+        for (let index = 0; index < mirrorControls.length; index += 1) {
+            const mirror = mirrorControls[index];
+            const sig = controlSignature(mirror);
+            let winner = null, winnerScore = -1;
+            const direct = native[index];
+            if (direct) {
+                const directScore = interactionSignatureScore(sig, direct.sig);
+                if (directScore >= 50) { winner = direct; winnerScore = directScore + 12; }
+            }
+            // cloneNode(true) preserves interactive-control order in the common path. Only pay the
+            // signature search when sanitization/site rewrites actually shifted that order.
+            if (!winner) {
+                for (const candidate of native) {
+                    const score = interactionSignatureScore(sig, candidate.sig);
+                    if (score > winnerScore) { winner = candidate; winnerScore = score; }
+                }
+            }
+            if (!winner || winnerScore < 24) continue;
+            const key = String(index);
+            let kind = '';
+            for (const [action, selector] of Object.entries(RETAINED_ACTION_SELECTORS)) {
+                if (action === 'input') continue;
+                try { if (mirror.matches(selector)) { kind = action; break; } } catch {}
+            }
+            controls.set(key, {
+                key,
+                kind,
+                sourceIndex:winner.index,
+                nativeSig:winner.sig,
+                mirrorSig:sig,
+                state:winner.state,
+            });
+        }
+        record.interactionCapsule = { capturedAt:Date.now(), controls, nativeCount:native.length, mirrorCount:mirrorControls.length };
+        record.mirrorControlDescriptors = new WeakMap();
+        state.interactionCapsules += 1;
+        state.interactionCapsuleControls += controls.size;
+        return record.interactionCapsule;
+    }
+
+    function capsuleEquivalentNode(record, descriptor, source) {
+        const key = descriptor?.capsuleKey;
+        if (!key || !record?.interactionCapsule?.controls || !(source instanceof Element)) return null;
+        const saved = record.interactionCapsule.controls.get(key);
+        if (!saved) return null;
+        const currentControls = source.querySelectorAll(FULL_INTERACTIVE_SELECTOR);
+        const byIndex = Number.isInteger(saved.sourceIndex) ? currentControls[saved.sourceIndex] : null;
+        if (byIndex instanceof Element && interactionSignatureScore(descriptor.sig, controlSignature(byIndex)) >= 24) return byIndex;
+        let winner = null, winnerScore = 0;
+        for (const candidate of currentControls) {
+            const score = interactionSignatureScore(saved.nativeSig, controlSignature(candidate));
+            if (score > winnerScore) { winner = candidate; winnerScore = score; }
+        }
+        return winnerScore >= 24 ? winner : null;
+    }
+
+    function contextControlSnapshot(record, element, options = {}) {
+        if (!record || !(element instanceof Element)) return null;
+        const key = element.getAttribute('data-tu-control-key') || controlDescriptor(record, element)?.capsuleKey || '';
+        if (!key) return null;
+        const sig = controlSignature(element);
+        const editable = element.getAttribute('contenteditable') === 'true';
+        const password = element.matches?.('input[type="password"]');
+        const fileInput = element.matches?.('input[type="file"]');
+        const snapshot = {
+            key,
+            kind: interactionActionKind(element) || (element.matches?.(TEXT_EDIT_SELECTOR) ? 'input' : ''),
+            sig,
+            edited: Boolean(options.edited),
+            updatedAt: Date.now(),
+        };
+        if (!password && !fileInput && 'value' in element) snapshot.value = String(element.value ?? '');
+        if ('checked' in element) snapshot.checked = Boolean(element.checked);
+        if (element instanceof HTMLSelectElement) snapshot.selectedIndex = element.selectedIndex;
+        if (editable) {
+            snapshot.html = element.innerHTML;
+            snapshot.text = element.textContent || '';
+        }
+        if (element instanceof HTMLDetailsElement) snapshot.open = Boolean(element.open);
+        for (const attr of CONTEXT_STATE_ATTRS) {
+            if (element.hasAttribute(attr)) snapshot[attr] = element.getAttribute(attr) || '';
+        }
+        return snapshot;
+    }
+
+    function interactionContextSnapshotActive(snapshot) {
+        if (!snapshot) return false;
+        if (snapshot.edited) return true;
+        if (snapshot.open === true) return true;
+        if (snapshot['aria-expanded'] === 'true' || snapshot['aria-selected'] === 'true' || snapshot['aria-checked'] === 'true') return true;
+        if (snapshot['data-state'] && /^(open|active|checked|selected|expanded)$/i.test(snapshot['data-state'])) return true;
+        if (snapshot.kind === 'poll' && snapshot.checked === true) return true;
+        return false;
+    }
+
+    function ensureInteractionContextStore() {
+        if (state.interactionContextStore instanceof Map) return state.interactionContextStore;
+        const store = new Map();
+        try {
+            const raw = sessionStorage.getItem(INTERACTION_CONTEXT_STORAGE_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (parsed && typeof parsed === 'object') {
+                for (const [id, saved] of Object.entries(parsed)) {
+                    if (!saved || typeof saved !== 'object') continue;
+                    const controls = new Map();
+                    for (const item of Array.isArray(saved.controls) ? saved.controls : []) {
+                        if (item?.key) controls.set(String(item.key), item);
+                    }
+                    if (controls.size || saved.showText === '1') store.set(id, { updatedAt:Number(saved.updatedAt || 0), showText:saved.showText === '1' ? '1' : '0', controls });
+                }
+            }
+        } catch {}
+        state.interactionContextStore = store;
+        state.interactionContextSessionLoads += 1;
+        return store;
+    }
+
+    function savedInteractionContext(record) {
+        if (!record?.id) return null;
+        if (record.interactionContext?.controls instanceof Map) return record.interactionContext;
+        const saved = ensureInteractionContextStore().get(record.id);
+        if (!saved) return null;
+        record.interactionContext = { updatedAt:saved.updatedAt || 0, showText:saved.showText || '0', controls:new Map(saved.controls) };
+        return record.interactionContext;
+    }
+
+    function ensureInteractionContext(record) {
+        if (!record) return null;
+        return savedInteractionContext(record) || (record.interactionContext = { updatedAt:Date.now(), showText:'0', controls:new Map() });
+    }
+
+    function flushInteractionContextStore() {
+        clearTimeout(state.interactionContextSaveTimer);
+        state.interactionContextSaveTimer = 0;
+        const store = ensureInteractionContextStore();
+        const payload = {};
+        for (const [id, context] of store) {
+            if (!context?.controls?.size && context?.showText !== '1') continue;
+            payload[id] = { updatedAt:context.updatedAt || Date.now(), showText:context.showText || '0', controls:[...context.controls.values()] };
+        }
+        try {
+            sessionStorage.setItem(INTERACTION_CONTEXT_STORAGE_KEY, JSON.stringify(payload));
+            state.interactionContextSessionSaves += 1;
+        } catch {}
+    }
+
+    function scheduleInteractionContextSave(record) {
+        if (!record?.id || !record.interactionContext) return;
+        const store = ensureInteractionContextStore();
+        if (record.interactionContext.controls.size || record.interactionContext.showText === '1') store.set(record.id, record.interactionContext);
+        else store.delete(record.id);
+        clearTimeout(state.interactionContextSaveTimer);
+        state.interactionContextSaveTimer = setTimeout(flushInteractionContextStore, 120);
+    }
+
+    function rememberInteractionContext(record, element, options = {}) {
+        const snapshot = contextControlSnapshot(record, element, options);
+        if (!snapshot) return null;
+        const context = ensureInteractionContext(record);
+        if (!context) return null;
+        const existing = context.controls.get(snapshot.key);
+        if (existing?.edited && !snapshot.edited) snapshot.edited = true;
+        if (interactionContextSnapshotActive(snapshot)) context.controls.set(snapshot.key, snapshot);
+        else context.controls.delete(snapshot.key);
+        context.updatedAt = Date.now();
+        if (record.item?.dataset?.tuShowText === '1') context.showText = '1';
+        state.interactionContextCaptures += 1;
+        scheduleInteractionContextSave(record);
+        return snapshot;
+    }
+
+    function clearInteractionContext(record, { drafts = false, all = false } = {}) {
+        const context = savedInteractionContext(record);
+        if (!context) return;
+        if (all) context.controls.clear();
+        else if (drafts) {
+            for (const [key, snapshot] of [...context.controls]) if (snapshot?.edited || snapshot?.kind === 'input') context.controls.delete(key);
+        }
+        context.updatedAt = Date.now();
+        scheduleInteractionContextSave(record);
+    }
+
+    function contextMirrorTarget(root, snapshot) {
+        if (!(root instanceof Element) || !snapshot) return null;
+        if (snapshot.key) {
+            try {
+                const direct = root.querySelector(`[data-tu-control-key="${cssAttrValue(snapshot.key)}"]`);
+                if (direct && interactionSignatureScore(snapshot.sig, controlSignature(direct)) >= 24) return direct;
+            } catch {}
+        }
+        let winner = null, winnerScore = 0;
+        for (const candidate of root.querySelectorAll(FULL_INTERACTIVE_SELECTOR)) {
+            const score = interactionSignatureScore(snapshot.sig, controlSignature(candidate));
+            if (score > winnerScore) { winner = candidate; winnerScore = score; }
+        }
+        return winnerScore >= 24 ? winner : null;
+    }
+
+    function applyContextSnapshot(element, snapshot) {
+        if (!(element instanceof Element) || !snapshot) return false;
+        const editable = element.getAttribute('contenteditable') === 'true';
+        try {
+            if (snapshot.value !== undefined && 'value' in element && !element.matches?.('input[type="password"],input[type="file"]')) element.value = String(snapshot.value);
+            if (snapshot.checked !== undefined && 'checked' in element) element.checked = Boolean(snapshot.checked);
+            if (snapshot.selectedIndex !== undefined && element instanceof HTMLSelectElement) element.selectedIndex = Number(snapshot.selectedIndex);
+            if (editable && snapshot.html !== undefined) element.innerHTML = String(snapshot.html);
+            if (element instanceof HTMLDetailsElement && snapshot.open !== undefined) element.open = Boolean(snapshot.open);
+            for (const attr of CONTEXT_STATE_ATTRS) if (snapshot[attr] !== undefined) element.setAttribute(attr, String(snapshot[attr]));
+            return true;
+        } catch { return false; }
+    }
+
+    function restoreInteractionContext(record, mirrorRoot = record?.clone) {
+        const context = savedInteractionContext(record);
+        if (!context || !(mirrorRoot instanceof Element)) return 0;
+        annotateInteractionMirror(record, mirrorRoot);
+        let restored = 0;
+        for (const snapshot of context.controls.values()) {
+            const target = contextMirrorTarget(mirrorRoot, snapshot);
+            if (target && applyContextSnapshot(target, snapshot)) restored += 1;
+        }
+        if (context.showText === '1' && record.item) record.item.dataset.tuShowText = '1';
+        if (restored) state.interactionContextRestores += restored;
+        return restored;
+    }
+
+    function missingStickyInteractionContext(record, mirrorRoot) {
+        const context = savedInteractionContext(record);
+        if (!context || !(mirrorRoot instanceof Element)) return 0;
+        let missing = 0;
+        for (const snapshot of context.controls.values()) {
+            if (!interactionContextSnapshotActive(snapshot)) continue;
+            if (!contextMirrorTarget(mirrorRoot, snapshot)) missing += 1;
+        }
+        return missing;
+    }
+
+    function mergeFreshInteractiveState(record, freshRoot, currentRoot) {
+        if (!(freshRoot instanceof Element) || !(currentRoot instanceof Element)) return 0;
+        annotateInteractionMirror(record, freshRoot);
+        annotateInteractionMirror(record, currentRoot);
+        const context = savedInteractionContext(record);
+        let merged = 0;
+        for (const fresh of freshRoot.querySelectorAll(FULL_INTERACTIVE_SELECTOR)) {
+            if (!(fresh instanceof Element)) continue;
+            const key = fresh.getAttribute('data-tu-control-key') || '';
+            let current = key ? currentRoot.querySelector(`[data-tu-control-key="${cssAttrValue(key)}"]`) : null;
+            if (!current || interactionSignatureScore(controlSignature(fresh), controlSignature(current)) < 24) {
+                const snapshot = { key:'', sig:controlSignature(fresh) };
+                current = contextMirrorTarget(currentRoot, snapshot);
+            }
+            if (!(current instanceof Element)) continue;
+            const owned = key ? context?.controls?.get(key) : null;
+            try {
+                for (const attr of [...CONTEXT_STATE_ATTRS,'aria-label','title','disabled']) {
+                    if (owned && interactionContextSnapshotActive(owned) && CONTEXT_STATE_ATTRS.includes(attr)) continue;
+                    if (fresh.hasAttribute(attr)) current.setAttribute(attr, fresh.getAttribute(attr) || '');
+                    else current.removeAttribute(attr);
+                }
+                if ((!owned || !owned.edited) && 'checked' in fresh && 'checked' in current) current.checked = Boolean(fresh.checked);
+                merged += 1;
+            } catch {}
+        }
+        return merged;
+    }
+
+    function rememberNativeInteractionContext(record, mirror, actual) {
+        if (!record || !(mirror instanceof Element) || !(actual instanceof Element)) return null;
+        const snapshot = contextControlSnapshot(record, mirror, { edited:false });
+        if (!snapshot) return null;
+        const nativeState = interactionControlState(actual);
+        snapshot.checked = nativeState.checked;
+        for (const attr of CONTEXT_STATE_ATTRS) if (actual.hasAttribute(attr)) snapshot[attr] = actual.getAttribute(attr) || '';
+        if (actual instanceof HTMLDetailsElement) snapshot.open = actual.open;
+        const context = ensureInteractionContext(record);
+        if (interactionContextSnapshotActive(snapshot)) context.controls.set(snapshot.key, snapshot);
+        else context.controls.delete(snapshot.key);
+        context.updatedAt = Date.now();
+        state.interactionContextCaptures += 1;
+        scheduleInteractionContextSave(record);
+        applyContextSnapshot(mirror, snapshot);
+        return snapshot;
     }
 
     function retainedControlDescriptors(record) {
@@ -4842,7 +5465,11 @@
             if (item) {
                 item.dataset.tuShowText = item.dataset.tuShowText === '1' ? '0' : '1';
                 const record = state.cache.get(item.dataset.tuItem || '');
-                if (record) syncTextPeek(record);
+                if (record) {
+                    const context = ensureInteractionContext(record);
+                    if (context) { context.showText = item.dataset.tuShowText === '1' ? '1' : '0'; context.updatedAt = Date.now(); scheduleInteractionContextSave(record); }
+                    syncTextPeek(record);
+                }
                 updateRecordMeasurement(item);
                 scheduleGeometryAudit(40);
             }
@@ -4857,7 +5484,7 @@
         event.preventDefault();
         event.stopPropagation();
         const result = await executeMirrorAction(record, target);
-        if (!result.ok) showToast(`${SITE_LABEL} is restoring that retained post. Try the control again in a moment.`);
+        if (!result.ok) showToast(`${SITE_LABEL} could not reconnect that native action automatically.`);
     }
 
     function createHud() {
@@ -4902,8 +5529,8 @@
             if (toggle) {
                 settings[toggle] = !settings[toggle]; saveSettings();
                 if (toggle === 'softRails') discoverRails();
-                if (toggle === 'compact') document.documentElement.dataset.tuCompact = settings.compact ? '1' : '0';
-                if (toggle === 'mediaOnly') { document.documentElement.dataset.tuMediaOnly = settings.mediaOnly ? '1' : '0'; scheduleGeometryAudit(40); }
+                if (toggle === 'compact' && state.shell) state.shell.dataset.tuCompact = settings.compact ? '1' : '0';
+                if (toggle === 'mediaOnly') { if (state.shell) state.shell.dataset.tuMediaOnly = settings.mediaOnly ? '1' : '0'; scheduleGeometryAudit(40); }
                 if (toggle === 'turboMedia') syncAllMedia();
                 if (toggle === 'liveInteraction' && !settings.liveInteraction) deactivateLiveInteraction();
                 syncControls(); return;
@@ -5005,8 +5632,8 @@
         try { window.scrollTo(0, 0); } catch {}
         clearTimeout(state.routeTimer);
         state.routeTimer = setTimeout(() => {
-            discoverRails(true);
             discoverTop();
+            discoverRails(true);
             captureVisiblePosts();
             if (settings.proactiveBuffer) ensureBuffer(Math.max(adaptiveBufferTarget(), 28), 'route');
         }, 260);
@@ -5173,9 +5800,10 @@
         }
 
         window.addEventListener('resize', () => {
-            discoverRails(); discoverTop(); scheduleMasonry();
+            discoverTop(); discoverRails(); scheduleMasonry();
         }, { passive:true });
         window.addEventListener('popstate', () => setTimeout(routeChanged, 0));
+        window.addEventListener('pagehide', () => { if (state.interactionContextStore instanceof Map) flushInteractionContextStore(); }, { capture:true });
         try { if (typeof SITE.subscribeNavigation === 'function') SITE.subscribeNavigation(() => setTimeout(routeChanged, 0)); } catch {}
 
         if (settings.adaptivePerformance && 'PerformanceObserver' in window) {
@@ -5195,8 +5823,8 @@
     }
 
     function fullRescan() {
-        discoverRails();
         discoverTop();
+        discoverRails();
         captureVisiblePosts();
         verifyRailClosed('left'); verifyRailClosed('right');
         if (settings.proactiveBuffer) ensureBuffer(adaptiveBufferTarget(3), 'manual');
@@ -5308,7 +5936,7 @@
                 interact:(id, action = 'like', options = {}) => interactRetainedPost(id, action, options),
                 controls:(id) => retainedControlDescriptors(state.cache.get(String(id || '').trim())),
                 sourceMounted:(id) => Boolean(locateMountedSource(String(id || ''))),
-                postInfo:(id) => { const record = state.cache.get(String(id || '')); return record ? { id:record.id, sequence:record.sequence, nativeScrollTop:record.nativeScrollTop, nativeDocumentY:record.nativeDocumentY, sourceMounted:Boolean(locateMountedSource(record.id)) } : null; },
+                postInfo:(id) => { const record = state.cache.get(String(id || '')); return record ? { id:record.id, sequence:record.sequence, nativeScrollTop:record.nativeScrollTop, nativeDocumentY:record.nativeDocumentY, sourceMounted:Boolean(locateMountedSource(record.id)), interactionControls:record.interactionCapsule?.controls?.size || record.interactionMirrorCount || record.clone?.querySelectorAll?.(FULL_INTERACTIVE_SELECTOR)?.length || 0, interactionCapturedAt:record.interactionCapsule?.capturedAt || 0, contextControls:record.interactionContext?.controls?.size || savedInteractionContext(record)?.controls?.size || 0, contextUpdatedAt:record.interactionContext?.updatedAt || 0 } : null; },
                 live:() => postId(closestSourcePost(state.actionStage?.actual)) || null,
                 deactivateLive:() => { restoreActionStage(); return updateDiagnostics(true); },
                 syncMedia:() => { syncAllMedia(); return updateDiagnostics(true); },
@@ -5327,12 +5955,9 @@
         // before capture begins. Starting the timer here simply lets its minimum delay elapse while
         // UltraDeck performs work it had to do anyway instead of adding dead wait after boot.
         setTimeout(() => captureVisiblePosts(), 0);
-        // Resolve native chrome against the site's existing style tree first. UltraDeck's large mirror
-        // stylesheet is needed before shell/source marking, not before these native geometry reads.
-        // Delaying its insertion avoids making the browser rematch that stylesheet across Tumblr's
-        // entire live tree just to discover stable rail/top bounds.
-        discoverRails(true);
-        discoverTop();
+        // Start from the adapter's conservative top baseline. Native chrome/rail geometry is measured
+        // inside the first capture read phase, after the feed's unavoidable geometry pass and before
+        // clone/rail writes. This avoids a separate full-document layout before capture can begin.
         injectStyle();
         createMirror();
         createHud();
@@ -5349,9 +5974,11 @@
         // The first capture was armed at boot entry so its task boundary remains intact without
         // paying an additional timer delay after mandatory setup has already completed.
         setTimeout(() => {
-            discoverRails();
-            discoverTop();
             captureVisiblePosts();
+            // Empty/loading feeds may not have paid the capture geometry pass yet. Only those cases
+            // need the recovery discovery here; a successful initial capture keeps this timer read-free.
+            if (!state.topDiscoveryRuns) discoverTop();
+            if (!state.railDiscoveryComplete) discoverRails(true);
             if (settings.proactiveBuffer) ensureBuffer(Math.max(adaptiveBufferTarget(), 32), 'boot');
             scheduleGeometryAudit(120);
         }, 500);
