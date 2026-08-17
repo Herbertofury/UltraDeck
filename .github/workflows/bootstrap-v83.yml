@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat bootstrap-v83/source.b64.* | base64 -d > /tmp/ultradeck-v8.3.0-source.zip
+          cat bootstrap-v83/payload/source.b64.* | base64 -d > /tmp/ultradeck-v8.3.0-source.zip
           echo '0b835d8743bdc00950367309f794a6a6bc0fc18b8ff7420c54d1d8d33f1a32d9  /tmp/ultradeck-v8.3.0-source.zip' | sha256sum -c -
           rm -rf /tmp/ud83
           mkdir -p /tmp/ud83
