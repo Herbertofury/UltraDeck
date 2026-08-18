@@ -10,9 +10,22 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
       - run: python3 shared-runtime-source/build_runtime.py
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run build:firefox
       - run: python3 scripts/build_portable.py
-      - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py
+      - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py tests/test_surround_contract.py tests/verify_surround_browser.py
+      - run: node --check shared-runtime-source/ultradeck-runtime-body.js
+      - run: node --check shared-runtime-source/surround-mode.js
+      - run: node --check dist-manual/chromium-mv3/runtime-main.js
+      - run: node --check dist-manual/firefox-mv3/runtime-main.js
+      - run: python3 tests/test_surround_contract.py
+      - run: python3 tests/verify_surround_browser.py
       - run: |
           python3 - <<'PY'
           import json, pathlib
@@ -27,15 +40,19 @@ jobs:
               assert (out/'site-tiktok.js').is_file()
               assert (out/'options.html').is_file() and (out/'options.js').is_file()
           body=(root/'shared-runtime-source/ultradeck-runtime-body.js').read_text()
+          surround=(root/'shared-runtime-source/surround-mode.js').read_text()
           tiktok=(root/'shared-runtime-source/adapters/tiktok.js').read_text()
           options=(root/'public/options.html').read_text()
           bridge=(root/'entrypoints/bridge.content.ts').read_text()
-          assert 'content-visibility' not in body.lower()
+          assert 'content-visibility' not in (body+surround).lower()
           assert 'identityMutationSkips' in body
           assert 'interactionAutoRetries' in body
           assert 'INTERACTION_CONTEXT_STORAGE_KEY' in body
           assert 'retainedVideoPlayback' in tiktok and 'tiktokPlaybackRecoveryInstalled' in tiktok
           assert 'primeRetainedVideo' in body and 'ultradeck:site-gate' in body
-          assert 'ultradeckSites' in bridge
-          for site in ('tumblr','patreon','x','tiktok'): assert f'site-{site}' in options
+          assert 'ultradeckSites' in bridge and 'ultradeckSurroundSites' in bridge
+          assert 'surroundMode' in surround
+          for site in ('tumblr','patreon','x','tiktok'):
+              assert f'site-{site}' in options
+              assert f'surround-{site}' in options
           PY

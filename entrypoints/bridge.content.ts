@@ -10,7 +10,9 @@ const STATE_EVENT = 'ultradeck:state';
 const SITE_GATE_EVENT = 'ultradeck:site-gate';
 const STORAGE_KEY = 'ultradeckSettings';
 const SITE_STORAGE_KEY = 'ultradeckSites';
+const SURROUND_SITE_KEY = 'ultradeckSurroundSites';
 const SITE_DEFAULTS: SiteSettings = Object.freeze({ tumblr:true, patreon:true, x:true, tiktok:true });
+const SURROUND_DEFAULTS: SiteSettings = Object.freeze({ tumblr:false, patreon:false, x:false, tiktok:false });
 let sequence = 0;
 
 function siteForHostname(hostname: string): SiteId | null {
@@ -22,16 +24,18 @@ function siteForHostname(hostname: string): SiteId | null {
   return null;
 }
 
-function normalizeSiteSettings(value: unknown): SiteSettings {
-  const out: SiteSettings = { ...SITE_DEFAULTS };
+function normalizeSettings(value: unknown, defaults: SiteSettings): SiteSettings {
+  const out: SiteSettings = { ...defaults };
   if (value && typeof value === 'object') {
-    for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) {
+    for (const id of Object.keys(defaults) as SiteId[]) {
       const candidate = (value as Partial<SiteSettings>)[id];
       if (typeof candidate === 'boolean') out[id] = candidate;
     }
   }
   return out;
 }
+const normalizeSiteSettings = (value: unknown) => normalizeSettings(value, SITE_DEFAULTS);
+const normalizeSurroundSettings = (value: unknown) => normalizeSettings(value, SURROUND_DEFAULTS);
 
 export default defineContentScript({
   matches: [
@@ -86,9 +90,14 @@ export default defineContentScript({
 
     async function restoreSettings() {
       try {
-        const stored = await browser.storage.local.get(STORAGE_KEY);
-        const settings = stored[STORAGE_KEY];
-        if (settings && typeof settings === 'object') await pageCommand('setSettings', settings, 5000);
+        const [generalStored, surroundStored] = await Promise.all([
+          browser.storage.local.get(STORAGE_KEY),
+          browser.storage.local.get(SURROUND_SITE_KEY),
+        ]);
+        const generalValue = generalStored[STORAGE_KEY];
+        const general = generalValue && typeof generalValue === 'object' ? { ...(generalValue as Record<string, unknown>) } : {};
+        const surround = normalizeSurroundSettings(surroundStored[SURROUND_SITE_KEY]);
+        await pageCommand('setSettings', { ...general, surroundMode:site ? surround[site] : false }, 5000);
       } catch {
         // Page-local settings remain authoritative if extension storage is unavailable.
       }
@@ -108,7 +117,17 @@ export default defineContentScript({
     document.addEventListener(STATE_EVENT, (event) => {
       try {
         const payload = JSON.parse(String((event as CustomEvent<string>).detail || '{}')) as DeckState;
-        if (payload.settings) void browser.storage.local.set({ [STORAGE_KEY]: payload.settings });
+        if (!payload.settings) return;
+        const { surroundMode, ...general } = payload.settings as Record<string, unknown>;
+        void browser.storage.local.set({ [STORAGE_KEY]: general });
+        if (site && typeof surroundMode === 'boolean') {
+          void browser.storage.local.get(SURROUND_SITE_KEY).then((stored) => {
+            const surround = normalizeSurroundSettings(stored[SURROUND_SITE_KEY]);
+            if (surround[site] === surroundMode) return;
+            surround[site] = surroundMode;
+            return browser.storage.local.set({ [SURROUND_SITE_KEY]: surround });
+          });
+        }
       } catch {}
     }, true);
 
@@ -121,13 +140,21 @@ export default defineContentScript({
     });
 
     browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== 'local' || !site || !changes[SITE_STORAGE_KEY]) return;
-      const prefs = normalizeSiteSettings(changes[SITE_STORAGE_KEY].newValue);
-      const nextEnabled = prefs[site];
-      if (!gateReady) { publishGate(nextEnabled); return; }
-      if (nextEnabled === enabled) return;
-      publishGate(nextEnabled);
-      location.reload();
+      if (areaName !== 'local' || !site) return;
+      if (changes[SITE_STORAGE_KEY]) {
+        const prefs = normalizeSiteSettings(changes[SITE_STORAGE_KEY].newValue);
+        const nextEnabled = prefs[site];
+        if (!gateReady) { publishGate(nextEnabled); return; }
+        if (nextEnabled !== enabled) {
+          publishGate(nextEnabled);
+          location.reload();
+          return;
+        }
+      }
+      if (enabled && changes[SURROUND_SITE_KEY]) {
+        const surround = normalizeSurroundSettings(changes[SURROUND_SITE_KEY].newValue);
+        void pageCommand('setSettings', { surroundMode:surround[site] }, 5000).catch(() => {});
+      }
     });
 
     void initializeGate();

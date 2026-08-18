@@ -2,7 +2,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = Path(__file__).resolve().parent
-BODY = (SHARED / 'ultradeck-runtime-body.js').read_text(encoding='utf-8').rstrip() + '\n'
+BODY = (
+    (SHARED / 'ultradeck-runtime-body.js').read_text(encoding='utf-8').rstrip()
+    + '\n\n'
+    + (SHARED / 'surround-mode.js').read_text(encoding='utf-8').rstrip()
+    + '\n'
+)
 VERSION = '8.5.0'
 ADAPTERS = {
     'tumblr': {
