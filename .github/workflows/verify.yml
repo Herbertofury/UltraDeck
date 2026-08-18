@@ -13,11 +13,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - run: corepack enable
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm build
-      - run: pnpm build:firefox
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run build:firefox
       - run: python3 shared-runtime-source/build_runtime.py
       - run: python3 scripts/build_portable.py
       - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py tests/test_surround_contract.py tests/verify_surround_browser.py
