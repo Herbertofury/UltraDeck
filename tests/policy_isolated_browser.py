@@ -2,11 +2,37 @@ from __future__ import annotations
 import hashlib, json, os, shutil, stat, subprocess
 from pathlib import Path
 
-SYSTEM_CHROMIUM = Path(os.environ.get('ULTRADECK_SYSTEM_CHROMIUM', '/usr/lib/chromium/chromium'))
-SYSTEM_DIR = SYSTEM_CHROMIUM.parent
 RUNTIME_HOME = Path(os.environ.get('ULTRADECK_BROWSER_RUNTIME_HOME', '/tmp/ultradeck-browser-lab'))
-SYSTEM_POLICY_ROOT = b'/etc/chromium'
-ISOLATED_POLICY_ROOT = b'/tmp/udpolicy'
+
+def _discover_system_browser() -> Path:
+    configured=os.environ.get('ULTRADECK_SYSTEM_CHROMIUM','').strip()
+    candidates=[]
+    if configured: candidates.append(Path(configured).expanduser())
+    candidates.extend([
+        Path('/usr/lib/chromium/chromium'),
+        Path('/opt/google/chrome/chrome'),
+        Path('/opt/google/chrome/google-chrome'),
+    ])
+    for command in ('chromium','chromium-browser','google-chrome-stable','google-chrome'):
+        found=shutil.which(command)
+        if found: candidates.append(Path(found))
+    seen=set()
+    for candidate in candidates:
+        try: resolved=candidate.resolve()
+        except Exception: continue
+        if resolved in seen: continue
+        seen.add(resolved)
+        if resolved.is_file(): return resolved
+    return Path('/usr/lib/chromium/chromium')
+
+SYSTEM_CHROMIUM = _discover_system_browser()
+SYSTEM_DIR = SYSTEM_CHROMIUM.parent
+if 'google/chrome' in SYSTEM_CHROMIUM.as_posix():
+    SYSTEM_POLICY_ROOT = b'/etc/opt/chrome'
+    ISOLATED_POLICY_ROOT = b'/tmp/udpolicyxx'
+else:
+    SYSTEM_POLICY_ROOT = b'/etc/chromium'
+    ISOLATED_POLICY_ROOT = b'/tmp/udpolicy'
 if len(SYSTEM_POLICY_ROOT) != len(ISOLATED_POLICY_ROOT):
     raise RuntimeError('UltraDeck policy relocation roots must have equal byte length')
 
@@ -29,10 +55,10 @@ def ensure_isolated_browser() -> Path:
         return explicit
     if not SYSTEM_CHROMIUM.is_file(): raise FileNotFoundError(SYSTEM_CHROMIUM)
     st=SYSTEM_CHROMIUM.stat()
-    fingerprint=hashlib.sha256(f'{SYSTEM_CHROMIUM}:{st.st_size}:{st.st_mtime_ns}:{sha256(SYSTEM_CHROMIUM)}'.encode()).hexdigest()[:16]
+    fingerprint=hashlib.sha256(f'{SYSTEM_CHROMIUM}:{st.st_size}:{st.st_mtime_ns}:{sha256(SYSTEM_CHROMIUM)}:{SYSTEM_POLICY_ROOT!r}'.encode()).hexdigest()[:16]
     runtime_dir=RUNTIME_HOME/f'chromium-policy-isolated-{fingerprint}'
     executable=runtime_dir/'chromium'; marker=runtime_dir/'ultradeck-runtime.json'
-    expected={'schema':'ultradeck.browser-runtime/1','system':str(SYSTEM_CHROMIUM),'systemSha256':sha256(SYSTEM_CHROMIUM),'policyFrom':SYSTEM_POLICY_ROOT.decode(),'policyTo':ISOLATED_POLICY_ROOT.decode()}
+    expected={'schema':'ultradeck.browser-runtime/2','system':str(SYSTEM_CHROMIUM),'systemSha256':sha256(SYSTEM_CHROMIUM),'policyFrom':SYSTEM_POLICY_ROOT.decode(),'policyTo':ISOLATED_POLICY_ROOT.decode()}
     if executable.is_file() and marker.is_file():
         try:
             current=json.loads(marker.read_text())
@@ -46,7 +72,9 @@ def ensure_isolated_browser() -> Path:
         try: target.symlink_to(item,target_is_directory=item.is_dir())
         except FileExistsError: pass
     tmp=runtime_dir/'.chromium.tmp'; shutil.copy2(SYSTEM_CHROMIUM,tmp); data=tmp.read_bytes(); count=data.count(SYSTEM_POLICY_ROOT)
-    if count<1: tmp.unlink(missing_ok=True); raise RuntimeError('Chromium policy root literal not found')
+    if count<1:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f'Chromium policy root literal not found: {SYSTEM_POLICY_ROOT.decode()} in {SYSTEM_CHROMIUM}')
     patched=data.replace(SYSTEM_POLICY_ROOT,ISOLATED_POLICY_ROOT)
     if len(patched)!=len(data): tmp.unlink(missing_ok=True); raise RuntimeError('Policy relocation changed executable length')
     tmp.write_bytes(patched); tmp.chmod(tmp.stat().st_mode|stat.S_IXUSR|stat.S_IXGRP|stat.S_IXOTH); os.replace(tmp,executable)
