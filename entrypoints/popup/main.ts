@@ -135,9 +135,13 @@ $('openOptions').addEventListener('click', () => void browser.runtime.openOption
 bind('nav','toggleNav'); bind('extras','toggleExtras'); bind('focus','toggleFocus'); bind('sync','syncMedia'); bind('rebalance','rebalance'); bind('rescan','rescan');
 
 async function init() {
-  const [stored, tab] = await Promise.all([browser.storage.local.get([SITE_KEY, SURROUND_KEY]), activeTab()]);
-  sites = normalizeMap(stored[SITE_KEY], SITE_DEFAULTS);
-  surroundSites = normalizeMap(stored[SURROUND_KEY], SURROUND_DEFAULTS);
+  const [siteStored, surroundStored, tab] = await Promise.all([
+    browser.storage.local.get(SITE_KEY),
+    browser.storage.local.get(SURROUND_KEY),
+    activeTab(),
+  ]);
+  sites = normalizeMap(siteStored[SITE_KEY], SITE_DEFAULTS);
+  surroundSites = normalizeMap(surroundStored[SURROUND_KEY], SURROUND_DEFAULTS);
   activeSite = siteForUrl(tab?.url);
   renderSiteToggles();
   if (!activeSite) { fail(new Error('Open Tumblr, Patreon, X, or TikTok in the active tab.')); return; }
