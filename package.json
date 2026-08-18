@@ -1,6 +1,6 @@
 {
   "name": "ultradeck-extension",
-  "version": "8.5.0",
+  "version": "8.6.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.9.2",
@@ -15,7 +15,7 @@
     "build:portable": "python3 scripts/build_portable.py"
   },
   "devDependencies": {
-    "typescript": "5.8.3",
+    "typescript": "7.0.2",
     "wxt": "0.21.3"
   }
 }

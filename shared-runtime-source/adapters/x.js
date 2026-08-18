@@ -28,7 +28,7 @@
     uncapturedSelector:'article[data-testid="tweet"]:not([data-tu-native-source="1"]),article[role="article"]:not([data-tu-native-source="1"])',
     timelineSelector:'[aria-label*="Timeline" i],[data-testid="primaryColumn"] section,main section',
     timelineEvidenceSelector:'article[data-testid="tweet"] a[href*="/status/"],article[role="article"] a[href*="/status/"]', contentSelector:'article',
-    excludedAncestorSelector:'aside,[role="complementary"]', identityAttributes:['data-post-id','data-id','href'], routeAttributes:[], topBaseline:56,
+    excludedAncestorSelector:'aside,[role="complementary"]', identityAttributes:['data-post-id','data-id','href'], routeAttributes:[], topBaseline:56, maxDeckTop:132, bootEvidenceSelector:'#react-root,[data-testid="primaryColumn"],main[role="main"]',
     postId:statusId, invalidatePostId,
     isPost(post) { return Boolean(post instanceof HTMLElement && post.matches('article') && statusId(post)); },
     locateSourceById(id, root=document) {

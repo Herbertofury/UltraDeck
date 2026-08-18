@@ -19,6 +19,8 @@
     identityAttributes: ['data-id'],
     routeAttributes: ['data-timeline','data-timeline-id'],
     topBaseline: 76,
+    maxDeckTop: 154,
+    bootEvidenceSelector: '[data-timeline],[data-timeline-id],main',
     postId(post) {
       return String(post?.dataset?.id || post?.getAttribute?.('data-id') || '').trim();
     },
