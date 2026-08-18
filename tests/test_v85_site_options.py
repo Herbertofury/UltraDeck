@@ -4,8 +4,8 @@ from playwright.sync_api import sync_playwright
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tests'))
 from policy_isolated_browser import ensure_isolated_browser, diagnostics as browser_diagnostics
-EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR',str(ROOT/'dist-manual/chromium-mv3'))).resolve();VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.5.0')
-CERT=pathlib.Path(tempfile.mkdtemp(prefix='ud-v85-options-cert-'))
+EXT=pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR',str(ROOT/'dist-manual/chromium-mv3'))).resolve();VERSION=os.environ.get('ULTRADECK_EXPECT_VERSION','8.5.0');HEADED=os.environ.get('ULTRADECK_HEADED','').strip().lower() in {'1','true','yes','on'}
+CERT=pathlib.Path(tempfile.mkdtemp(prefix='ud-site-options-cert-'))
 subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(CERT/'k'),'-out',str(CERT/'c'),'-days','1','-subj','/CN=ultradeck.test'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
 def page_html():
@@ -34,32 +34,28 @@ def extension_id(profile:pathlib.Path):
 def main():
     socketserver.ThreadingTCPServer.daemon_threads=True
     srv=socketserver.ThreadingTCPServer(('127.0.0.1',0),H);tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(CERT/'c',CERT/'k');srv.socket=tls.wrap_socket(srv.socket,server_side=True);threading.Thread(target=srv.serve_forever,daemon=True).start();port=srv.server_address[1]
-    browser=ensure_isolated_browser();runtime=browser_diagnostics();profile=pathlib.Path(tempfile.mkdtemp(prefix='ud-v85-options-profile-'))
+    browser=ensure_isolated_browser();runtime=browser_diagnostics();profile=pathlib.Path(tempfile.mkdtemp(prefix='ud-site-options-profile-'))
     args=[f'--disable-extensions-except={EXT}',f'--load-extension={EXT}','--no-sandbox',f'--host-resolver-rules=MAP www.tiktok.com 127.0.0.1']
     with sync_playwright() as pw:
-        ctx=pw.chromium.launch_persistent_context(str(profile),executable_path=str(browser),headless=True,ignore_https_errors=True,args=args)
+        ctx=pw.chromium.launch_persistent_context(str(profile),executable_path=str(browser),headless=not HEADED,ignore_https_errors=True,args=args)
         try:
             seed=ctx.new_page();seed.goto(f'https://www.tiktok.com:{port}/foryou',wait_until='domcontentloaded',timeout=30000);seed.wait_for_function(f"window.__UltraDeck?.version==='{VERSION}'",timeout=15000)
             eid=extension_id(profile);options=ctx.new_page();options.goto(f'chrome-extension://{eid}/options.html',wait_until='domcontentloaded',timeout=20000)
             options.wait_for_function("document.getElementById('save-state').textContent==='Saved'",timeout=5000)
             ids=['tumblr','patreon','x','tiktok'];assert all(options.locator(f'#site-{x}').is_checked() for x in ids)
-            # Every site switch writes through real extension storage and persists across options reload.
             for sid in ids: options.locator(f'#site-{sid}').uncheck()
             options.wait_for_timeout(200)
             options.reload(wait_until='domcontentloaded');options.wait_for_function("document.getElementById('save-state').textContent==='Saved'",timeout=5000)
             assert all(not options.locator(f'#site-{x}').is_checked() for x in ids)
-            # TikTok is disabled after the storage-driven tab reload: no UltraDeck runtime or shell is present.
             seed.wait_for_load_state('domcontentloaded');seed.wait_for_timeout(250)
             assert seed.evaluate("!window.__UltraDeck && !document.querySelector('#tu-ultrawide-deck-shell')")
-            # Re-enable TikTok only. The bridge reloads the affected open tab and the page-world runtime boots.
             options.locator('#site-tiktok').check();options.wait_for_timeout(200)
             seed.wait_for_load_state('domcontentloaded');seed.wait_for_function(f"window.__UltraDeck?.version==='{VERSION}'",timeout=15000)
             assert seed.evaluate("document.documentElement.dataset.tuSiteEnabled==='1' && !!document.querySelector('#tu-ultrawide-deck-shell')")
-            # Restore all defaults and prove persistence again.
             for sid in ['tumblr','patreon','x']: options.locator(f'#site-{sid}').check()
             options.wait_for_timeout(200);options.reload(wait_until='domcontentloaded');options.wait_for_function("document.getElementById('save-state').textContent==='Saved'",timeout=5000)
             final={sid:options.locator(f'#site-{sid}').is_checked() for sid in ids}
-            out={'browser':runtime,'extensionId':eid,'finalSites':final,'tiktokEnabled':seed.evaluate("document.documentElement.dataset.tuSiteEnabled"),'version':seed.evaluate('window.__UltraDeck?.version||null')};print(json.dumps(out,indent=2))
+            out={'browser':runtime,'headed':HEADED,'extensionId':eid,'finalSites':final,'tiktokEnabled':seed.evaluate("document.documentElement.dataset.tuSiteEnabled"),'version':seed.evaluate('window.__UltraDeck?.version||null')};print(json.dumps(out,indent=2))
             assert all(final.values()) and out['tiktokEnabled']=='1' and out['version']==VERSION
             assert runtime['policyIsolated'] and not runtime['hostPoliciesModified']
         finally:
