@@ -9,6 +9,7 @@ from policy_isolated_browser import ensure_isolated_browser, diagnostics as brow
 EXT = pathlib.Path(os.environ.get('ULTRADECK_EXTENSION_DIR', str(ROOT / 'dist-manual/chromium-mv3'))).resolve()
 VERSION = os.environ.get('ULTRADECK_EXPECT_VERSION', '8.6.0')
 OUT = pathlib.Path(os.environ.get('ULTRADECK_VISUAL_OUT', str(ROOT / 'artifacts/visual-verification'))).resolve()
+HEADED = os.environ.get('ULTRADECK_HEADED', '').strip().lower() in {'1','true','yes','on'}
 OUT.mkdir(parents=True, exist_ok=True)
 CERT = pathlib.Path(tempfile.mkdtemp(prefix='ud-v86-visual-cert-'))
 subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(CERT/'k'),'-out',str(CERT/'c'),'-days','1','-subj','/CN=ultradeck.test'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -83,14 +84,18 @@ def main():
     args=[f'--disable-extensions-except={EXT}',f'--load-extension={EXT}','--no-sandbox',f'--host-resolver-rules={resolver}']
     results={}
     with sync_playwright() as pw:
-        ctx=pw.chromium.launch_persistent_context(str(profile),executable_path=str(browser),headless=True,ignore_https_errors=True,viewport={'width':2048,'height':1080},args=args)
+        ctx=pw.chromium.launch_persistent_context(str(profile),executable_path=str(browser),headless=not HEADED,ignore_https_errors=True,viewport={'width':2048,'height':1080},args=args)
         try:
             cases=[('tumblr',f'https://www.tumblr.com:{port}/dashboard/stuff_for_you',154,8),('patreon',f'https://www.patreon.com:{port}/home',156,7),('x',f'https://x.com:{port}/home',132,7),('tiktok',f'https://www.tiktok.com:{port}/foryou',None,6)]
             for name,url,top_cap,min_posts in cases:
                 page=ctx.new_page(); console=[]
                 page.on('console',lambda msg,c=console: c.append(f'{msg.type}: {msg.text}'))
                 page.goto(url,wait_until='domcontentloaded',timeout=30000)
-                page.wait_for_function(f"window.__UltraDeck?.version==='{VERSION}'",timeout=20000)
+                try:
+                    page.wait_for_function(f"window.__UltraDeck?.version==='{VERSION}'",timeout=20000)
+                except Exception:
+                    diag={'url':page.url,'title':page.title(),'extensionId':extension_id(profile),'html':page.locator('html').get_attribute('data-tu-site-enabled'),'console':console[-20:]}
+                    raise AssertionError(f'{name} UltraDeck runtime did not start: {json.dumps(diag)}')
                 page.wait_for_function(f"(window.__UltraDeck?.diagnostics?.(true)?.cachedPosts||0)>={min_posts}",timeout=20000)
                 page.wait_for_timeout(900); data=measure(page)
                 if top_cap is not None:
@@ -108,7 +113,7 @@ def main():
             cpath=OUT/'x-cloudflare-safe.png'; challenge.screenshot(path=str(cpath),full_page=False); challenge.close()
             challenge_state.update({'screenshot':str(cpath),'consoleErrors':[x for x in cconsole if x.startswith('error:')]}); results['x-cloudflare']=challenge_state
 
-            report={'version':VERSION,'browser':runtime,'extensionId':extension_id(profile),'results':results}
+            report={'version':VERSION,'browser':runtime,'headed':HEADED,'extensionId':extension_id(profile),'results':results}
             (OUT/'visual-verification.json').write_text(json.dumps(report,indent=2)+'\n'); print(json.dumps(report,indent=2))
             assert runtime['policyIsolated'] and not runtime['hostPoliciesModified']
         finally:
