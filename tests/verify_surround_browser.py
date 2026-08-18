@@ -7,11 +7,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
 chrome = shutil.which('google-chrome') or shutil.which('google-chrome-stable') or shutil.which('chromium') or shutil.which('chromium-browser')
 if not chrome:
     raise SystemExit('Chrome/Chromium is required for surround browser verification')
 
-userscript_path = ROOT / 'dist' / 'Tumblr-UltraWide-Deck-v8.5.0.user.js'
+userscript_path = ROOT / 'dist' / f'Tumblr-UltraWide-Deck-v{VERSION}.user.js'
 if not userscript_path.is_file():
     raise SystemExit(f'missing built userscript: {userscript_path}')
 userscript = userscript_path.read_text(encoding='utf-8')
@@ -103,4 +104,4 @@ assert payload['offAgain']['visibility'] == 'hidden', payload
 assert payload['offAgain']['surround'] is False, payload
 
 print(json.dumps(payload, indent=2, sort_keys=True))
-print('real headless browser surround toggle verified')
+print('real headless browser surround toggle verified', VERSION)

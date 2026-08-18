@@ -1,7 +1,9 @@
 (() => {
   'use strict';
   const POST_PATH_RE = /\/posts\/(?:[^/?#]*?-)?(\d+)(?:[/?#]|$)/i;
-  const POST_SHELL = 'article,[role="article"],[data-testid*="post" i],[data-tag*="post" i]';
+  const PRIMARY_SHELL = 'article,[role="article"]';
+  const FALLBACK_SHELL = '[data-post-id],[data-post_id],[data-testid="post-card"],[data-testid="post"],[data-tag="post-card"],[data-tag="post"]';
+  const POST_SHELL = `${PRIMARY_SHELL},${FALLBACK_SHELL}`;
   const linksIn = (root) => root instanceof Element || root instanceof Document ? root.querySelectorAll('a[href*="/posts/"]') : [];
   const postIdCache = new WeakMap();
   const sourceById = new Map();
@@ -11,71 +13,79 @@
     sourceById.set(String(id), post);
     return String(id);
   };
+  const idFromLink = (link) => {
+    if (!(link instanceof Element)) return '';
+    const match = String(link.getAttribute('href') || '').match(POST_PATH_RE);
+    return match ? match[1] : '';
+  };
   const postId = (post) => {
     if (!(post instanceof Element)) return '';
-    for (const attr of ['data-post-id','data-post_id','data-id']) {
+    for (const attr of ['data-post-id','data-post_id']) {
       const value = String(post.getAttribute(attr) || '').trim();
       if (/^\d+$/.test(value)) return remember(post, value);
     }
     const cached = postIdCache.get(post);
-    if (cached) {
-      if (!cached.link || (cached.link instanceof Element && post.contains(cached.link) && String(cached.link.getAttribute('href') || '') === cached.href)) return cached.id;
-      postIdCache.delete(post);
-    }
+    if (cached && (!cached.link || (cached.link instanceof Element && post.contains(cached.link) && String(cached.link.getAttribute('href') || '') === cached.href))) return cached.id;
+    postIdCache.delete(post);
     for (const link of linksIn(post)) {
-      if (link.closest(POST_SHELL) !== post && post.matches(POST_SHELL)) continue;
-      const href = String(link.getAttribute('href') || '');
-      const match = href.match(POST_PATH_RE);
-      if (match) return remember(post, match[1], link, href);
+      const id = idFromLink(link);
+      if (id) return remember(post, id, link, link.getAttribute('href') || '');
     }
     return '';
   };
   const invalidatePostId = (post) => { if (post instanceof Element) postIdCache.delete(post); };
   const candidateFromLink = (link) => {
-    if (!(link instanceof Element)) return null;
-    const shell = link.closest(POST_SHELL);
-    if (shell && !shell.matches('main,section,[role="main"]')) return shell;
+    if (!(link instanceof Element) || !idFromLink(link)) return null;
+    const direct = link.closest(PRIMARY_SHELL);
+    if (direct instanceof HTMLElement && !direct.matches('main,section,[role="main"]')) return direct;
+    const fallback = link.closest(FALLBACK_SHELL);
+    if (fallback instanceof HTMLElement && !fallback.matches('main,section,[role="main"]')) return fallback;
     let node = link.parentElement;
-    for (let depth = 0; node && depth < 9; depth += 1, node = node.parentElement) {
+    let best = null;
+    for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
       if (!(node instanceof HTMLElement)) continue;
-      if (node.matches('main,section,[role="main"]')) break;
+      if (node.matches('main,[role="main"]')) break;
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 260 || rect.height < 90 || rect.height > 2400) continue;
       const controls = node.querySelectorAll('button,[role="button"],a[href],input,textarea').length;
       const media = node.querySelectorAll('img,picture,video,audio,iframe').length;
-      if (controls >= 2 || media >= 1) {
-        const rect = node.getBoundingClientRect();
-        if (rect.width >= 260 && rect.height >= 90) return node;
-      }
+      const headings = node.querySelectorAll('h1,h2,h3,[role="heading"]').length;
+      if (controls >= 2 || media >= 1 || headings >= 1) best = node;
+      if (best && node.querySelectorAll('a[href*="/posts/"]').length === 1 && controls >= 3) break;
     }
-    return link.parentElement;
+    return best;
   };
   const candidates = (root = document) => {
-    const out = [], seen = new Set();
+    const byId = new Map();
     const add = (el) => {
-      if (!(el instanceof HTMLElement) || seen.has(el)) return;
+      if (!(el instanceof HTMLElement)) return;
       const id = postId(el);
       if (!id) return;
-      seen.add(el); out.push(el);
+      const current = byId.get(id);
+      if (!current || current.contains(el)) byId.set(id, el);
     };
-    if (root instanceof Element && root.matches?.(POST_SHELL)) add(root);
     try {
-      root.querySelectorAll?.(POST_SHELL).forEach(add);
       linksIn(root).forEach((link) => add(candidateFromLink(link)));
+      root.querySelectorAll?.(POST_SHELL).forEach((el) => {
+        if (el.querySelector?.('a[href*="/posts/"]') || el.hasAttribute('data-post-id') || el.hasAttribute('data-post_id')) add(el);
+      });
     } catch {}
-    return out;
+    return [...byId.values()];
   };
   globalThis.__UltraDeckSiteAdapter = Object.freeze({
-    id: 'patreon', label: 'Patreon', version: 2,
+    id: 'patreon', label: 'Patreon', version: 3,
     matches: ['https://www.patreon.com/*'],
     postSelector: POST_SHELL,
-    uncapturedSelector: 'article:not([data-tu-native-source="1"]),[role="article"]:not([data-tu-native-source="1"]),[data-testid*="post" i]:not([data-tu-native-source="1"]),[data-tag*="post" i]:not([data-tu-native-source="1"])',
+    uncapturedSelector: `${POST_SHELL.split(',').map((s) => `${s}:not([data-tu-native-source="1"])`).join(',')}`,
     timelineSelector: 'main,[role="main"]', timelineEvidenceSelector: 'a[href*="/posts/"]', contentSelector: POST_SHELL,
-    excludedAncestorSelector: 'aside,[role="complementary"]', identityAttributes: ['data-post-id','data-post_id','data-id','href'], routeAttributes: [], topBaseline: 64,
+    excludedAncestorSelector: 'aside,[role="complementary"]', identityAttributes: ['data-post-id','data-post_id','href'], routeAttributes: [],
+    topBaseline: 64, maxDeckTop: 156, bootEvidenceSelector: 'main,[role="main"],a[href*="/posts/"]',
     postCandidates: candidates, postId, invalidatePostId,
     isPost(post) { return Boolean(post instanceof HTMLElement && postId(post)); },
     closestPost(node) {
       if (!(node instanceof Element)) return null;
       const direct = node.closest(POST_SHELL);
-      if (direct && postId(direct)) return direct;
+      if (direct instanceof HTMLElement && postId(direct)) return direct;
       const link = node.closest('a[href*="/posts/"]') || node.querySelector?.('a[href*="/posts/"]');
       return candidateFromLink(link);
     },
