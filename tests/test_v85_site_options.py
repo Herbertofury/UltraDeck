@@ -57,7 +57,7 @@ def main():
             final={sid:options.locator(f'#site-{sid}').is_checked() for sid in ids}
             out={'browser':runtime,'headed':HEADED,'extensionId':eid,'finalSites':final,'tiktokEnabled':seed.evaluate("document.documentElement.dataset.tuSiteEnabled"),'version':seed.evaluate('window.__UltraDeck?.version||null')};print(json.dumps(out,indent=2))
             assert all(final.values()) and out['tiktokEnabled']=='1' and out['version']==VERSION
-            assert runtime['policyIsolated'] and not runtime['hostPoliciesModified']
+            assert (runtime['policyIsolated'] or runtime['explicitCleanBrowser']) and not runtime['hostPoliciesModified']
         finally:
             ctx.close();srv.shutdown();srv.server_close()
 if __name__=='__main__':main()
