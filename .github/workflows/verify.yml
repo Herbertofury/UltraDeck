@@ -15,6 +15,13 @@ jobs:
           node-version: '24'
       - run: npm install --no-audit --no-fund
       - run: python3 -m pip install --disable-pip-version-check playwright
+      - run: python3 -m playwright install chromium
+      - run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              print(f"ULTRADECK_CHROMIUM_EXECUTABLE={p.chromium.executable_path}")
+          PY
       - run: python3 shared-runtime-source/build_runtime.py
       - run: npm run typecheck
       - run: npm run build
