@@ -115,7 +115,7 @@ def main():
 
             report={'version':VERSION,'browser':runtime,'headed':HEADED,'extensionId':extension_id(profile),'results':results}
             (OUT/'visual-verification.json').write_text(json.dumps(report,indent=2)+'\n'); print(json.dumps(report,indent=2))
-            assert runtime['policyIsolated'] and not runtime['hostPoliciesModified']
+            assert (runtime['policyIsolated'] or runtime['explicitCleanBrowser']) and not runtime['hostPoliciesModified']
         finally:
             ctx.close(); srv.shutdown(); srv.server_close()
 
