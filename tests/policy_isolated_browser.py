@@ -16,12 +16,17 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda:f.read(8*1024*1024),b''): h.update(chunk)
     return h.hexdigest()
 
+def explicit_browser() -> Path | None:
+    value=os.environ.get('ULTRADECK_CHROMIUM_EXECUTABLE','').strip()
+    if not value: return None
+    p=Path(value).expanduser().resolve()
+    if not p.is_file(): raise FileNotFoundError(p)
+    return p
+
 def ensure_isolated_browser() -> Path:
-    explicit=os.environ.get('ULTRADECK_CHROMIUM_EXECUTABLE','').strip()
-    if explicit:
-        p=Path(explicit).expanduser().resolve()
-        if not p.is_file(): raise FileNotFoundError(p)
-        return p
+    explicit=explicit_browser()
+    if explicit is not None:
+        return explicit
     if not SYSTEM_CHROMIUM.is_file(): raise FileNotFoundError(SYSTEM_CHROMIUM)
     st=SYSTEM_CHROMIUM.stat()
     fingerprint=hashlib.sha256(f'{SYSTEM_CHROMIUM}:{st.st_size}:{st.st_mtime_ns}:{sha256(SYSTEM_CHROMIUM)}'.encode()).hexdigest()[:16]
@@ -56,6 +61,17 @@ def diagnostics() -> dict:
     try: version=subprocess.check_output([str(p),'--version'],text=True,stderr=subprocess.STDOUT,timeout=15).strip()
     except Exception as exc: version=f'unavailable: {exc}'
     marker=p.parent/'ultradeck-runtime.json'; data=json.loads(marker.read_text()) if marker.is_file() else {}
-    return {'path':str(p),'version':version,'sha256':sha256(p),'policyIsolated':data.get('policyTo')==ISOLATED_POLICY_ROOT.decode(),'policyRoot':data.get('policyTo',''),'hostPoliciesModified':False,'systemChromium':str(SYSTEM_CHROMIUM),'systemSha256':data.get('systemSha256',sha256(SYSTEM_CHROMIUM)),'policyLiteralReplacements':data.get('policyLiteralReplacements',0)}
+    explicit=explicit_browser()
+    system_sha = data.get('systemSha256')
+    if not system_sha and SYSTEM_CHROMIUM.is_file(): system_sha=sha256(SYSTEM_CHROMIUM)
+    return {
+        'path':str(p), 'version':version, 'sha256':sha256(p),
+        'policyIsolated':data.get('policyTo')==ISOLATED_POLICY_ROOT.decode(),
+        'explicitCleanBrowser':explicit is not None,
+        'isolationMode':'relocated-policy-root' if data.get('policyTo')==ISOLATED_POLICY_ROOT.decode() else ('explicit-clean-profile' if explicit is not None else 'system'),
+        'policyRoot':data.get('policyTo',''), 'hostPoliciesModified':False,
+        'systemChromium':str(SYSTEM_CHROMIUM) if SYSTEM_CHROMIUM.is_file() else '',
+        'systemSha256':system_sha or '', 'policyLiteralReplacements':data.get('policyLiteralReplacements',0),
+    }
 
 if __name__=='__main__': print(json.dumps(diagnostics(),indent=2))
