@@ -10,18 +10,19 @@
   <main class="options-shell">
     <header>
       <div class="eyebrow">ULTRADECK v8.5.0</div>
-      <h1>Enabled sites</h1>
-      <p>Choose where UltraDeck is allowed to transform the native feed. Disabled sites stay completely native.</p>
+      <h1>Sites & layouts</h1>
+      <p>Choose where UltraDeck runs and whether each site opens in the optional Surround layout. Surround keeps the familiar center feed visible and puts retained UltraDeck lanes around it.</p>
     </header>
+    <div class="legend"><span>Site</span><span>Enabled</span><span>Surround</span></div>
     <section class="site-list" aria-label="Supported sites">
-      <label class="site-row"><span><strong>Tumblr</strong><small>www.tumblr.com</small></span><input id="site-tumblr" data-site="tumblr" type="checkbox"></label>
-      <label class="site-row"><span><strong>Patreon</strong><small>www.patreon.com</small></span><input id="site-patreon" data-site="patreon" type="checkbox"></label>
-      <label class="site-row"><span><strong>X / Twitter</strong><small>x.com and twitter.com</small></span><input id="site-x" data-site="x" type="checkbox"></label>
-      <label class="site-row"><span><strong>TikTok</strong><small>www.tiktok.com</small></span><input id="site-tiktok" data-site="tiktok" type="checkbox"></label>
+      <div class="site-row"><span><strong>Tumblr</strong><small>www.tumblr.com</small></span><label>Enabled <input id="site-tumblr" data-site="tumblr" type="checkbox"></label><label>Surround <input id="surround-tumblr" data-surround="tumblr" type="checkbox"></label></div>
+      <div class="site-row"><span><strong>Patreon</strong><small>www.patreon.com</small></span><label>Enabled <input id="site-patreon" data-site="patreon" type="checkbox"></label><label>Surround <input id="surround-patreon" data-surround="patreon" type="checkbox"></label></div>
+      <div class="site-row"><span><strong>X / Twitter</strong><small>x.com and twitter.com</small></span><label>Enabled <input id="site-x" data-site="x" type="checkbox"></label><label>Surround <input id="surround-x" data-surround="x" type="checkbox"></label></div>
+      <div class="site-row"><span><strong>TikTok</strong><small>www.tiktok.com</small></span><label>Enabled <input id="site-tiktok" data-site="tiktok" type="checkbox"></label><label>Surround <input id="surround-tiktok" data-surround="tiktok" type="checkbox"></label></div>
     </section>
     <section class="note">
-      <strong>Changes apply to open tabs automatically.</strong>
-      <p>UltraDeck reloads an affected supported tab only when that site's enabled state changes.</p>
+      <strong>Surround is off by default on every site.</strong>
+      <p>Enable/disable changes reload only affected tabs. Surround layout changes apply live through the page bridge and preserve the existing full-deck mode.</p>
     </section>
     <p id="save-state" class="save-state" role="status" aria-live="polite">Loading settings…</p>
   </main>
