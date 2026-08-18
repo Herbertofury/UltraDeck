@@ -90,9 +90,13 @@ export default defineContentScript({
 
     async function restoreSettings() {
       try {
-        const stored = await browser.storage.local.get([STORAGE_KEY, SURROUND_SITE_KEY]);
-        const general = stored[STORAGE_KEY] && typeof stored[STORAGE_KEY] === 'object' ? { ...(stored[STORAGE_KEY] as Record<string, unknown>) } : {};
-        const surround = normalizeSurroundSettings(stored[SURROUND_SITE_KEY]);
+        const [generalStored, surroundStored] = await Promise.all([
+          browser.storage.local.get(STORAGE_KEY),
+          browser.storage.local.get(SURROUND_SITE_KEY),
+        ]);
+        const generalValue = generalStored[STORAGE_KEY];
+        const general = generalValue && typeof generalValue === 'object' ? { ...(generalValue as Record<string, unknown>) } : {};
+        const surround = normalizeSurroundSettings(surroundStored[SURROUND_SITE_KEY]);
         await pageCommand('setSettings', { ...general, surroundMode:site ? surround[site] : false }, 5000);
       } catch {
         // Page-local settings remain authoritative if extension storage is unavailable.
