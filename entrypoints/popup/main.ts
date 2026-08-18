@@ -5,13 +5,16 @@ type DeckState = { version?: string; site?: string; siteLabel?: string; diagnost
 type SiteId = 'tumblr' | 'patreon' | 'x' | 'tiktok';
 type SiteSettings = Record<SiteId, boolean>;
 const SITE_KEY = 'ultradeckSites';
+const SURROUND_KEY = 'ultradeckSurroundSites';
 const SITE_DEFAULTS: SiteSettings = Object.freeze({ tumblr:true, patreon:true, x:true, tiktok:true });
+const SURROUND_DEFAULTS: SiteSettings = Object.freeze({ tumblr:false, patreon:false, x:false, tiktok:false });
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const status = $('status'), hint = $('hint'), diag = $('diag');
 const columns = $<HTMLSelectElement>('columns');
 for (let i = 1; i <= 20; i += 1) columns.append(new Option(String(i), String(i)));
 let state: DeckState | null = null;
 let sites: SiteSettings = { ...SITE_DEFAULTS };
+let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
 let activeSite: SiteId | null = null;
 let timer = 0;
 
@@ -26,9 +29,9 @@ function siteForUrl(url?: string): SiteId | null {
   } catch {}
   return null;
 }
-function normalizeSites(value: unknown): SiteSettings {
-  const out: SiteSettings = { ...SITE_DEFAULTS };
-  if (value && typeof value === 'object') for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) {
+function normalizeMap(value: unknown, defaults: SiteSettings): SiteSettings {
+  const out: SiteSettings = { ...defaults };
+  if (value && typeof value === 'object') for (const id of Object.keys(defaults) as SiteId[]) {
     const next = (value as Partial<SiteSettings>)[id];
     if (typeof next === 'boolean') out[id] = next;
   }
@@ -39,9 +42,11 @@ function setDeckControlsEnabled(enabled: boolean) {
     section.classList.toggle('disabled', !enabled);
     section.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('input,select,button').forEach((control) => { control.disabled = !enabled; });
   });
+  $<HTMLInputElement>('surround').disabled = !enabled || !activeSite;
 }
 function renderSiteToggles() {
   for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).checked = sites[id];
+  $<HTMLInputElement>('surround').checked = Boolean(activeSite && surroundSites[activeSite]);
 }
 async function activeTab() {
   const tabs = await browser.tabs.query({ active:true, currentWindow:true });
@@ -67,6 +72,7 @@ function render() {
   $<HTMLSelectElement>('layout').value = String(s.layoutMode ?? 'masonry');
   $<HTMLInputElement>('mediaOnly').checked = Boolean(s.mediaOnly ?? false);
   $<HTMLInputElement>('turbo').checked = Boolean(s.turboMedia ?? true);
+  $<HTMLInputElement>('surround').checked = Boolean(s.surroundMode ?? (activeSite ? surroundSites[activeSite] : false));
   $<HTMLInputElement>('minWidth').value = String(s.minCardWidth ?? 320);
   $('minWidthOut').textContent = `${s.minCardWidth ?? 320}px`;
   $<HTMLInputElement>('minHeight').value = String(s.minCardHeight ?? 0);
@@ -102,6 +108,13 @@ columns.addEventListener('change', () => void command('setColumns', columns.valu
 $<HTMLSelectElement>('layout').addEventListener('change', (e) => void command('setSettings', { layoutMode:(e.currentTarget as HTMLSelectElement).value }).catch(fail));
 $<HTMLInputElement>('mediaOnly').addEventListener('change', (e) => void command('setSettings', { mediaOnly:(e.currentTarget as HTMLInputElement).checked }).catch(fail));
 $<HTMLInputElement>('turbo').addEventListener('change', (e) => void command('setSettings', { turboMedia:(e.currentTarget as HTMLInputElement).checked }).catch(fail));
+$<HTMLInputElement>('surround').addEventListener('change', async (event) => {
+  if (!activeSite) return;
+  const checked = (event.currentTarget as HTMLInputElement).checked;
+  surroundSites = { ...surroundSites, [activeSite]:checked };
+  await browser.storage.local.set({ [SURROUND_KEY]:surroundSites });
+  await command('setSettings', { surroundMode:checked }).catch(fail);
+});
 for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEventListener('input', () => {
   if (timer) clearTimeout(timer);
   const input = $<HTMLInputElement>(id);
@@ -122,10 +135,11 @@ $('openOptions').addEventListener('click', () => void browser.runtime.openOption
 bind('nav','toggleNav'); bind('extras','toggleExtras'); bind('focus','toggleFocus'); bind('sync','syncMedia'); bind('rebalance','rebalance'); bind('rescan','rescan');
 
 async function init() {
-  const [stored, tab] = await Promise.all([browser.storage.local.get(SITE_KEY), activeTab()]);
-  sites = normalizeSites(stored[SITE_KEY]);
-  renderSiteToggles();
+  const [stored, tab] = await Promise.all([browser.storage.local.get([SITE_KEY, SURROUND_KEY]), activeTab()]);
+  sites = normalizeMap(stored[SITE_KEY], SITE_DEFAULTS);
+  surroundSites = normalizeMap(stored[SURROUND_KEY], SURROUND_DEFAULTS);
   activeSite = siteForUrl(tab?.url);
+  renderSiteToggles();
   if (!activeSite) { fail(new Error('Open Tumblr, Patreon, X, or TikTok in the active tab.')); return; }
   if (!sites[activeSite]) { renderDisabled(activeSite); return; }
   await command('getState');
