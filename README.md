@@ -61,3 +61,8 @@ See `docs/INSTALL-OPTIONS.md`. The v8.5 release contains unified Chromium and Fi
 ## Pinterest Nocturne reference
 
 Pinterest Nocturne 1.9.0 remains a recovered performance-design reference for jank reduction. UltraDeck applies the relevant scheduling and hot-path ideas at its own shared runtime and adapter boundaries while preserving full retention, real native actions, per-post context continuity, and video playback behavior.
+
+
+## Competing apps and differentiation
+
+[Source-linked comparison and evaluation backlog](COMPETITORS.md) records comparable tools, opportunities to test, evidence requirements and dated review status. Planned differentiation is not a claim of measured superiority.
