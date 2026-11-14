@@ -19,6 +19,9 @@ const pendingSiteEdits: Partial<SiteSettings> = {};
 const siteEditVersions: Partial<Record<SiteId, number>> = {};
 let siteSaveQueue = Promise.resolve();
 let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
+let surroundSaveQueue = Promise.resolve();
+let surroundEditVersion = 0;
+let pendingSurroundEdit: boolean | null = null;
 let activeSite: SiteId | null = null;
 let timer = 0;
 let pendingSliderSettings: Record<string, number> = {};
@@ -51,7 +54,7 @@ function setDeckControlsEnabled(enabled: boolean) {
 }
 function renderSiteToggles() {
   for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).checked = sites[id];
-  $<HTMLInputElement>('surround').checked = Boolean(activeSite && surroundSites[activeSite]);
+  $<HTMLInputElement>('surround').checked = Boolean(pendingSurroundEdit ?? (activeSite && surroundSites[activeSite]));
 }
 async function activeTab() {
   const tabs = await browser.tabs.query({ active:true, currentWindow:true });
@@ -77,7 +80,7 @@ function render() {
   $<HTMLSelectElement>('layout').value = String(s.layoutMode ?? 'masonry');
   $<HTMLInputElement>('mediaOnly').checked = Boolean(s.mediaOnly ?? false);
   $<HTMLInputElement>('turbo').checked = Boolean(s.turboMedia ?? true);
-  $<HTMLInputElement>('surround').checked = Boolean(s.surroundMode ?? (activeSite ? surroundSites[activeSite] : false));
+  $<HTMLInputElement>('surround').checked = Boolean(pendingSurroundEdit ?? s.surroundMode ?? (activeSite ? surroundSites[activeSite] : false));
   $<HTMLInputElement>('minWidth').value = String(s.minCardWidth ?? 320);
   $('minWidthOut').textContent = `${s.minCardWidth ?? 320}px`;
   $<HTMLInputElement>('minHeight').value = String(s.minCardHeight ?? 0);
@@ -113,19 +116,29 @@ columns.addEventListener('change', () => void command('setColumns', columns.valu
 $<HTMLSelectElement>('layout').addEventListener('change', (e) => void command('setSettings', { layoutMode:(e.currentTarget as HTMLSelectElement).value }).catch(fail));
 $<HTMLInputElement>('mediaOnly').addEventListener('change', (e) => void command('setSettings', { mediaOnly:(e.currentTarget as HTMLInputElement).checked }).catch(fail));
 $<HTMLInputElement>('turbo').addEventListener('change', (e) => void command('setSettings', { turboMedia:(e.currentTarget as HTMLInputElement).checked }).catch(fail));
-$<HTMLInputElement>('surround').addEventListener('change', async (event) => {
+$<HTMLInputElement>('surround').addEventListener('change', (event) => {
   if (!activeSite) return;
+  const site = activeSite;
   const checked = (event.currentTarget as HTMLInputElement).checked;
-  const next = { ...surroundSites, [activeSite]:checked };
-  try {
-    await browser.storage.local.set({ [SURROUND_KEY]:next });
-    surroundSites = next;
-  } catch (error) {
-    $<HTMLInputElement>('surround').checked = surroundSites[activeSite];
-    fail(error);
-    return;
-  }
-  await command('setSettings', { surroundMode:checked }).catch(fail);
+  const version = ++surroundEditVersion;
+  pendingSurroundEdit = checked;
+  // Keep persistence and the live command ordered together. An older response
+  // must not redraw over a newer checkbox edit waiting in this queue.
+  surroundSaveQueue = surroundSaveQueue.then(async () => {
+    const next = { ...surroundSites, [site]:checked };
+    try {
+      await browser.storage.local.set({ [SURROUND_KEY]:next });
+      surroundSites = next;
+    } catch (error) {
+      if (surroundEditVersion === version) pendingSurroundEdit = null;
+      $<HTMLInputElement>('surround').checked = pendingSurroundEdit ?? surroundSites[site];
+      fail(error);
+      return;
+    }
+    if (surroundEditVersion === version) pendingSurroundEdit = null;
+    await command('setSettings', { surroundMode:checked }).catch(fail);
+  });
+  return surroundSaveQueue;
 });
 for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEventListener('input', () => {
   if (timer) clearTimeout(timer);
