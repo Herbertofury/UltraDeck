@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
       - run: npm run build:firefox
       - run: python3 scripts/build_portable.py
-      - run: node --test tests/site-loader-race.test.cjs tests/site-gate-race.test.cjs
+      - run: node --test tests/site-loader-race.test.cjs tests/site-gate-race.test.cjs tests/site-disabled-storage.test.cjs
       - run: python3 -m py_compile shared-runtime-source/build_runtime.py scripts/build_portable.py scripts/package_release.py tests/test_site_regression_contract.py tests/verify_site_visuals.py tests/test_surround_contract.py tests/verify_surround_browser.py
       - run: node --check shared-runtime-source/ultradeck-runtime-body.js
       - run: node --check shared-runtime-source/site-hardening.js
