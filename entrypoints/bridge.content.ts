@@ -56,6 +56,7 @@ export default defineContentScript({
 
     let enabled = true;
     let gateReady = false;
+    let siteSettingsChanged = false;
 
     function challengeActive() { return site === 'x' && isChallengePage(); }
 
@@ -142,9 +143,9 @@ export default defineContentScript({
       try {
         const stored = await browser.storage.local.get(SITE_STORAGE_KEY);
         const prefs = normalizeSiteSettings(stored[SITE_STORAGE_KEY]);
-        publishGate(site ? prefs[site] : false);
+        if (!siteSettingsChanged) publishGate(site ? prefs[site] : false);
       } catch {
-        publishGate(true);
+        if (!siteSettingsChanged) publishGate(true);
       }
       if (enabled) void restoreSettings();
     }
@@ -179,6 +180,7 @@ export default defineContentScript({
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (challengeActive() || areaName !== 'local' || !site) return;
       if (changes[SITE_STORAGE_KEY]) {
+        siteSettingsChanged = true;
         const prefs = normalizeSiteSettings(changes[SITE_STORAGE_KEY].newValue);
         const nextEnabled = prefs[site];
         if (!gateReady) { publishGate(nextEnabled); return; }
