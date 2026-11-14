@@ -18,6 +18,7 @@ const pendingSiteEdits: Partial<SiteSettings> = {};
 let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
 let activeSite: SiteId | null = null;
 let timer = 0;
+let pendingSliderSettings: Record<string, number> = {};
 
 function siteForUrl(url?: string): SiteId | null {
   if (!url) return null;
@@ -121,7 +122,13 @@ for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEven
   const input = $<HTMLInputElement>(id);
   $(id+'Out').textContent = id === 'minHeight' && Number(input.value) === 0 ? 'Natural' : `${input.value}px`;
   const payload = id === 'minWidth' ? { minCardWidth:Number(input.value) } : id === 'minHeight' ? { minCardHeight:Number(input.value) } : { gap:Number(input.value) };
-  timer = window.setTimeout(() => void command('setSettings', payload).catch(fail), 100);
+  Object.assign(pendingSliderSettings, payload);
+  timer = window.setTimeout(() => {
+    const settings = pendingSliderSettings;
+    pendingSliderSettings = {};
+    timer = 0;
+    void command('setSettings', settings).catch(fail);
+  }, 100);
 });
 for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).addEventListener('change', async (event) => {
   const checked = (event.currentTarget as HTMLInputElement).checked;
