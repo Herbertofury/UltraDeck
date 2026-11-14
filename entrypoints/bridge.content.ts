@@ -114,7 +114,7 @@ export default defineContentScript({
           const detail = (event as CustomEvent<string>).detail;
           let payload: DeckState | null = null;
           try { payload = JSON.parse(String(detail || '{}')) as DeckState; } catch { return; }
-          if (payload.requestId !== requestId) return;
+          if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.requestId !== requestId) return;
           window.clearTimeout(timeout);
           document.removeEventListener(STATE_EVENT, onState as EventListener, true);
           resolve(payload);
@@ -154,7 +154,8 @@ export default defineContentScript({
       if (challengeActive() || (gateReady && !enabled)) return;
       try {
         const payload = JSON.parse(String((event as CustomEvent<string>).detail || '{}')) as DeckState;
-        if (!payload.settings) return;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)
+            || !payload.settings || typeof payload.settings !== "object" || Array.isArray(payload.settings)) return;
         const { surroundMode, ...general } = payload.settings as Record<string, unknown>;
         void browser.storage.local.set({ [STORAGE_KEY]: general });
         if (site && typeof surroundMode === 'boolean') {
