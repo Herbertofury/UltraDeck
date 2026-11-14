@@ -113,8 +113,15 @@ $<HTMLInputElement>('turbo').addEventListener('change', (e) => void command('set
 $<HTMLInputElement>('surround').addEventListener('change', async (event) => {
   if (!activeSite) return;
   const checked = (event.currentTarget as HTMLInputElement).checked;
-  surroundSites = { ...surroundSites, [activeSite]:checked };
-  await browser.storage.local.set({ [SURROUND_KEY]:surroundSites });
+  const next = { ...surroundSites, [activeSite]:checked };
+  try {
+    await browser.storage.local.set({ [SURROUND_KEY]:next });
+    surroundSites = next;
+  } catch (error) {
+    $<HTMLInputElement>('surround').checked = surroundSites[activeSite];
+    fail(error);
+    return;
+  }
   await command('setSettings', { surroundMode:checked }).catch(fail);
 });
 for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEventListener('input', () => {
