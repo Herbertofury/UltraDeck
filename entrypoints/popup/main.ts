@@ -16,6 +16,8 @@ let state: DeckState | null = null;
 let sites: SiteSettings = { ...SITE_DEFAULTS };
 let savedSites: SiteSettings = { ...SITE_DEFAULTS };
 const pendingSiteEdits: Partial<SiteSettings> = {};
+const siteEditVersions: Partial<Record<SiteId, number>> = {};
+let siteSaveQueue = Promise.resolve();
 let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
 let activeSite: SiteId | null = null;
 let timer = 0;
@@ -138,24 +140,33 @@ for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEven
     void command('setSettings', settings).catch(fail);
   }, 100);
 });
-for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).addEventListener('change', async (event) => {
+for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).addEventListener('change', (event) => {
   const checked = (event.currentTarget as HTMLInputElement).checked;
+  const version = siteEditVersions[id] = (siteEditVersions[id] || 0) + 1;
   pendingSiteEdits[id] = checked;
-  try {
-    await hydration;
-    sites = { ...sites, [id]:checked };
-    const next = { ...sites };
-    await browser.storage.local.set({ [SITE_KEY]:next });
-    savedSites = next;
-    if (activeSite === id) {
-      if (checked) { status.textContent = 'Reloading'; hint.textContent = 'UltraDeck is enabling on this tab…'; setDeckControlsEnabled(false); }
-      else renderDisabled(id);
+  // Persist each edit against the last successful write, not an optimistic
+  // snapshot containing unrelated edits which may still fail.
+  siteSaveQueue = siteSaveQueue.then(async () => {
+    try {
+      await hydration;
+      const next = { ...savedSites, [id]:checked };
+      await browser.storage.local.set({ [SITE_KEY]:next });
+      savedSites = next;
+      if (siteEditVersions[id] === version) delete pendingSiteEdits[id];
+      sites = { ...savedSites, ...pendingSiteEdits };
+      renderSiteToggles();
+      if (activeSite === id && siteEditVersions[id] === version) {
+        if (checked) { status.textContent = 'Reloading'; hint.textContent = 'UltraDeck is enabling on this tab…'; setDeckControlsEnabled(false); }
+        else renderDisabled(id);
+      }
+    } catch (error) {
+      if (siteEditVersions[id] === version) delete pendingSiteEdits[id];
+      sites = { ...savedSites, ...pendingSiteEdits };
+      renderSiteToggles();
+      fail(error);
     }
-  } catch (error) {
-    if (sites[id] === checked) sites = { ...sites, [id]:savedSites[id] };
-    $<HTMLInputElement>(`site-${id}`).checked = sites[id];
-    fail(error);
-  }
+  });
+  return siteSaveQueue;
 });
 $('openOptions').addEventListener('click', () => void browser.runtime.openOptionsPage());
 bind('nav','toggleNav'); bind('extras','toggleExtras'); bind('focus','toggleFocus'); bind('sync','syncMedia'); bind('rebalance','rebalance'); bind('rescan','rescan');
