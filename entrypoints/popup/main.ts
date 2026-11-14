@@ -14,6 +14,7 @@ const columns = $<HTMLSelectElement>('columns');
 for (let i = 1; i <= 20; i += 1) columns.append(new Option(String(i), String(i)));
 let state: DeckState | null = null;
 let sites: SiteSettings = { ...SITE_DEFAULTS };
+const pendingSiteEdits: Partial<SiteSettings> = {};
 let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
 let activeSite: SiteId | null = null;
 let timer = 0;
@@ -124,26 +125,34 @@ for (const id of ['minWidth','minHeight','gap']) $<HTMLInputElement>(id).addEven
 });
 for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`site-${id}`).addEventListener('change', async (event) => {
   const checked = (event.currentTarget as HTMLInputElement).checked;
-  sites = { ...sites, [id]:checked };
-  await browser.storage.local.set({ [SITE_KEY]:sites });
-  if (activeSite === id) {
-    if (checked) { status.textContent = 'Reloading'; hint.textContent = 'UltraDeck is enabling on this tab…'; setDeckControlsEnabled(false); }
-    else renderDisabled(id);
-  }
+  pendingSiteEdits[id] = checked;
+  try {
+    await hydration;
+    sites = { ...sites, [id]:checked };
+    await browser.storage.local.set({ [SITE_KEY]:sites });
+    if (activeSite === id) {
+      if (checked) { status.textContent = 'Reloading'; hint.textContent = 'UltraDeck is enabling on this tab…'; setDeckControlsEnabled(false); }
+      else renderDisabled(id);
+    }
+  } catch (error) { fail(error); }
 });
 $('openOptions').addEventListener('click', () => void browser.runtime.openOptionsPage());
 bind('nav','toggleNav'); bind('extras','toggleExtras'); bind('focus','toggleFocus'); bind('sync','syncMedia'); bind('rebalance','rebalance'); bind('rescan','rescan');
 
-async function init() {
+async function hydrate() {
   const [siteStored, surroundStored, tab] = await Promise.all([
     browser.storage.local.get(SITE_KEY),
     browser.storage.local.get(SURROUND_KEY),
     activeTab(),
   ]);
-  sites = normalizeMap(siteStored[SITE_KEY], SITE_DEFAULTS);
+  sites = { ...normalizeMap(siteStored[SITE_KEY], SITE_DEFAULTS), ...pendingSiteEdits };
   surroundSites = normalizeMap(surroundStored[SURROUND_KEY], SURROUND_DEFAULTS);
   activeSite = siteForUrl(tab?.url);
   renderSiteToggles();
+}
+const hydration = hydrate();
+async function init() {
+  await hydration;
   if (!activeSite) { fail(new Error('Open Tumblr, Patreon, X, or TikTok in the active tab.')); return; }
   if (!sites[activeSite]) { renderDisabled(activeSite); return; }
   await command('getState');
