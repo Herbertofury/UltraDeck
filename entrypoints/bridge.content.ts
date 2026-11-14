@@ -151,7 +151,7 @@ export default defineContentScript({
     }
 
     document.addEventListener(STATE_EVENT, (event) => {
-      if (challengeActive()) return;
+      if (challengeActive() || (gateReady && !enabled)) return;
       try {
         const payload = JSON.parse(String((event as CustomEvent<string>).detail || '{}')) as DeckState;
         if (!payload.settings) return;
@@ -159,6 +159,7 @@ export default defineContentScript({
         void browser.storage.local.set({ [STORAGE_KEY]: general });
         if (site && typeof surroundMode === 'boolean') {
           void browser.storage.local.get(SURROUND_SITE_KEY).then((stored) => {
+            if (challengeActive() || (gateReady && !enabled)) return;
             const surround = normalizeSurroundSettings(stored[SURROUND_SITE_KEY]);
             if (surround[site] === surroundMode) return;
             surround[site] = surroundMode;
