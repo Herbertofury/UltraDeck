@@ -107,5 +107,7 @@ export async function startSiteRuntime(ctx: ContentContext, site: UltraDeckSiteI
   const config = SITE_RUNTIME[site];
   const safe = await waitForSafeDocument(ctx, site, config);
   if (!safe || !ctx.isValid || isChallengePage()) return;
+  // Settings may change while document readiness is pending.
+  if (!(await siteEnabled(site)) || !ctx.isValid || isChallengePage()) return;
   await injectScript(config.script, { keepInDom: false });
 }
