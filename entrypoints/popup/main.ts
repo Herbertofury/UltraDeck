@@ -14,6 +14,7 @@ const columns = $<HTMLSelectElement>('columns');
 for (let i = 1; i <= 20; i += 1) columns.append(new Option(String(i), String(i)));
 let state: DeckState | null = null;
 let sites: SiteSettings = { ...SITE_DEFAULTS };
+let savedSites: SiteSettings = { ...SITE_DEFAULTS };
 const pendingSiteEdits: Partial<SiteSettings> = {};
 let surroundSites: SiteSettings = { ...SURROUND_DEFAULTS };
 let activeSite: SiteId | null = null;
@@ -143,12 +144,18 @@ for (const id of Object.keys(SITE_DEFAULTS) as SiteId[]) $<HTMLInputElement>(`si
   try {
     await hydration;
     sites = { ...sites, [id]:checked };
-    await browser.storage.local.set({ [SITE_KEY]:sites });
+    const next = { ...sites };
+    await browser.storage.local.set({ [SITE_KEY]:next });
+    savedSites = next;
     if (activeSite === id) {
       if (checked) { status.textContent = 'Reloading'; hint.textContent = 'UltraDeck is enabling on this tab…'; setDeckControlsEnabled(false); }
       else renderDisabled(id);
     }
-  } catch (error) { fail(error); }
+  } catch (error) {
+    if (sites[id] === checked) sites = { ...sites, [id]:savedSites[id] };
+    $<HTMLInputElement>(`site-${id}`).checked = sites[id];
+    fail(error);
+  }
 });
 $('openOptions').addEventListener('click', () => void browser.runtime.openOptionsPage());
 bind('nav','toggleNav'); bind('extras','toggleExtras'); bind('focus','toggleFocus'); bind('sync','syncMedia'); bind('rebalance','rebalance'); bind('rescan','rescan');
@@ -159,7 +166,8 @@ async function hydrate() {
     browser.storage.local.get(SURROUND_KEY),
     activeTab(),
   ]);
-  sites = { ...normalizeMap(siteStored[SITE_KEY], SITE_DEFAULTS), ...pendingSiteEdits };
+  savedSites = normalizeMap(siteStored[SITE_KEY], SITE_DEFAULTS);
+  sites = { ...savedSites, ...pendingSiteEdits };
   surroundSites = normalizeMap(surroundStored[SURROUND_KEY], SURROUND_DEFAULTS);
   activeSite = siteForUrl(tab?.url);
   renderSiteToggles();
